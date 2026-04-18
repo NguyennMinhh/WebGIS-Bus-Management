@@ -6,7 +6,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .models import BusStop, BusRoute
-from .serializers import BusStopSerializer, BusRouteSerializer
+from .serializers import BusStopSerializer, BusRouteInfoSerializer
 
 @api_view(['GET'])
 def stop_list(request):
@@ -34,5 +34,5 @@ def route_list(request):
     
     # Ở View này, BusRouteSerializer sẽ chỉ trả về các field nhẹ (id, ref, name...)
     # không bao gồm field 'path' (MultiLineString) để tối ưu tốc độ.
-    serializer = BusRouteSerializer(routes, many=True)
+    serializer = BusRouteInfoSerializer(routes, many=True)
     return Response(serializer.data)

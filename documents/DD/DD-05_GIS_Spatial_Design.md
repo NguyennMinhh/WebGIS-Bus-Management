@@ -171,14 +171,14 @@ GeoServer
 
 ```
 Connection type: PostGIS
-Host: db           (Docker service name)
+Host: host.docker.internal    (hostname đặc biệt của Docker Desktop → trỏ vào host Windows)
 Port: 5432
 Database: busrouting
 User: postgres
-Password: postgres
+Password: <giá trị POSTGRES_PASSWORD trong .env>
 ```
 
-**Lưu ý:** Trong Docker network, GeoServer kết nối DB qua hostname `db`, không phải `localhost`.
+**Lưu ý:** GeoServer chạy trong container, PostgreSQL chạy native trên Windows. Dùng `localhost` trong container sẽ trỏ vào chính container đó → lỗi connection refused. `host.docker.internal` là hostname do Docker Desktop cung cấp để container gọi về host.
 
 ### 4.3 SLD Styling
 

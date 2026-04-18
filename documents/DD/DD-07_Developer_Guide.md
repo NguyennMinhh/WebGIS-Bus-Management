@@ -1,9 +1,9 @@
 # DD-07 — Developer Guide (Hướng Dẫn Cho Developer Mới)
 
 > **Loại tài liệu:** Design Document
-> **Phiên bản:** 1.0
-> **Cập nhật lần cuối:** 2026-03-18
-> **Trạng thái:** Draft
+> **Phiên bản:** 2.0
+> **Cập nhật lần cuối:** 2026-04-18
+> **Trạng thái:** Current
 
 ---
 
@@ -22,56 +22,80 @@ Nếu bạn vừa join dự án, đọc theo thứ tự sau:
 
 ---
 
-## 2. Setup Máy Lần Đầu (15 phút)
+## 2. Setup Máy Lần Đầu
+
+**Mô hình chạy:** PostgreSQL + Backend + Frontend chạy **native trên Windows**, chỉ **GeoServer trong Docker**. Xem chi tiết đầy đủ tại [configure/SETUP.md](../../configure/SETUP.md).
 
 ### Bước 1: Clone & Chuẩn bị
 
 ```bash
 git clone <repo-url>
 cd WebGIS-BusRouting
-cp .env.example .env
+copy .env.example .env
 ```
 
-### Bước 2: Khởi động Docker
+Sửa `.env`: đặt `POSTGRES_PASSWORD` và `GDAL_LIBRARY_PATH` / `GEOS_LIBRARY_PATH` trỏ vào folder `bin\` của PostgreSQL đã cài (phải có `libwinpthread-1.dll` trong cùng folder).
+
+### Bước 2: Cài PostgreSQL + PostGIS (native)
+
+1. Tải PostgreSQL 16/18 installer → chạy installer
+2. Sau khi cài, dùng Stack Builder để cài **PostGIS**
+3. Tạo database:
+```sql
+CREATE DATABASE busrouting;
+\c busrouting
+CREATE EXTENSION postgis;
+```
+
+### Bước 3: Setup Python venv & Django
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r backend/requirements.txt
+
+cd backend
+python manage.py migrate
+python manage.py createsuperuser
+```
+
+### Bước 4: Khởi động GeoServer (Docker)
 
 ```bash
 docker compose up -d
-# Đợi khoảng 60 giây cho tất cả services khởi động
-docker compose ps   # Kiểm tra tất cả "running"
+# Đợi khoảng 60–90 giây cho GeoServer boot
 ```
 
-### Bước 3: Setup Database
+### Bước 5: Import dữ liệu
 
 ```bash
-docker compose exec backend python manage.py migrate
-docker compose exec backend python manage.py createsuperuser
-# Nhập username/password cho Django Admin (vd: admin / admin123)
+cd backend
+python manage.py import_geojson ../data/tay-ho-datas.geojson
 ```
 
-### Bước 4: Import dữ liệu
-
-```bash
-docker compose exec backend python manage.py import_geojson
-# Xem output để confirm số tuyến/điểm dừng được import
-```
-
-### Bước 5: Cấu hình GeoServer
+### Bước 6: Cấu hình GeoServer
 
 1. Mở http://localhost:8600/geoserver/web/
-2. Login: admin / geoserver
+2. Login: admin / geoserver (hoặc giá trị trong `.env`)
 3. Tạo **Workspace** → Name: `busrouting`, Namespace URI: `http://busrouting`
 4. Tạo **Store** → PostGIS:
    - Workspace: busrouting
    - Data source name: busrouting_postgis
-   - Host: **db** (không phải localhost!), Port: 5432
-   - Database: busrouting, User: postgres, Password: postgres
-5. Publish **Layer** `routes_busroute` từ store trên
-6. Publish **Layer** `routes_busstop` từ store trên
-7. Với mỗi layer: set Native/Declared SRS = **EPSG:4326**, tính bounding box = "Compute from data"
+   - Host: **`host.docker.internal`** (GeoServer chạy trong Docker, cần hostname này để gọi về PostgreSQL trên Windows host)
+   - Port: 5432
+   - Database: busrouting, User: postgres, Password: <từ .env>
+5. Publish layer `routes_busroute` và `routes_busstop`
+6. Với mỗi layer: set Native/Declared SRS = **EPSG:4326**, bounding box = "Compute from data"
 
-### Bước 6: Kiểm tra
+### Bước 7: Khởi động Frontend
 
-Mở http://localhost:5173 → Bản đồ Hà Nội xuất hiện với các đường tuyến xe buýt màu xanh.
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Mở http://localhost:5173 → bản đồ hiển thị các tuyến xe buýt.
 
 ---
 
@@ -81,7 +105,8 @@ Mở http://localhost:5173 → Bản đồ Hà Nội xuất hiện với các đ
 WebGIS-BusRouting/
 ├── .env                          ← Cấu hình secrets (không commit)
 ├── .env.example                  ← Mẫu .env (có commit)
-├── docker-compose.yml            ← Định nghĩa 4 services
+├── docker-compose.yml            ← Chỉ có service geoserver
+├── configure/SETUP.md            ← Hướng dẫn setup chi tiết cho Windows
 │
 ├── backend/
 │   ├── backend/settings.py       ← Cấu hình Django (DB, CORS, apps)
@@ -140,11 +165,9 @@ urlpatterns = router.urls
 ### 4.2 Thêm model field mới
 
 ```bash
-# 1. Sửa models.py
-# 2. Tạo migration
-docker compose exec backend python manage.py makemigrations
-# 3. Apply migration
-docker compose exec backend python manage.py migrate
+cd backend
+python manage.py makemigrations
+python manage.py migrate
 ```
 
 ### 4.3 Thêm component frontend mới
@@ -158,24 +181,18 @@ docker compose exec backend python manage.py migrate
 ### 4.4 Debug backend
 
 ```bash
-# Xem logs realtime
-docker compose logs -f backend
+# Django shell
+cd backend
+python manage.py shell
 
-# Vào shell Python trong container
-docker compose exec backend python manage.py shell
-
-# Debug query PostGIS
-docker compose exec db psql -U postgres busrouting
+# psql
+psql -U postgres -d busrouting
 ```
 
 ### 4.5 Debug frontend
 
-```bash
-# Xem logs frontend (Vite)
-docker compose logs -f frontend
-
-# Hoặc xem thẳng trong browser DevTools → Console
-```
+- Terminal chạy `npm run dev` hiển thị lỗi Vite
+- Browser DevTools → Console cho lỗi runtime và network tab cho API calls
 
 ---
 
@@ -240,13 +257,10 @@ FROM routes_busroute r;
 
 ### 6.3 "Backend không kết nối được DB"
 
-**Nguyên nhân phổ biến:** Backend start trước khi DB ready.
-**Giải pháp:**
-```bash
-docker compose restart backend
-# Hoặc
-docker compose up -d  # Docker compose tự xử lý dependency
-```
+**Nguyên nhân phổ biến:**
+1. PostgreSQL service Windows chưa start → mở `services.msc` → start "postgresql-x64-16/18"
+2. `.env` sai `POSTGRES_PASSWORD` hoặc `POSTGRES_HOST`
+3. GDAL DLL load fail (sẽ thấy `ImproperlyConfigured: Could not find the GDAL library`) → kiểm tra folder DLL có `libwinpthread-1.dll` không
 
 ---
 
@@ -257,7 +271,7 @@ docker compose up -d  # Docker compose tự xử lý dependency
 2. Layer name đúng? Phải khớp với `LAYER_BUS_ROUTES` trong `mapConfig.ts`
 3. Workspace name đúng? `busrouting` không phải `BusRouting`
 4. Có dữ liệu trong DB? `SELECT COUNT(*) FROM routes_busroute;`
-5. GeoServer có kết nối được DB? Kiểm tra trong GeoServer Admin → Stores
+5. GeoServer có kết nối được DB? Kiểm tra trong GeoServer Admin → Stores. Host phải là **`host.docker.internal`** (không phải `localhost`, không phải `db`)
 
 ---
 
@@ -294,10 +308,7 @@ CORS_ALLOWED_ORIGINS = [
 
 **Nguyên nhân:** Vite chỉ inject env vars có prefix `VITE_`.
 **Kiểm tra:** File `.env` có `VITE_GEOSERVER_URL=...` chưa?
-**Restart Vite** sau khi thay đổi `.env`:
-```bash
-docker compose restart frontend
-```
+**Restart Vite** sau khi thay đổi `.env`: dừng `npm run dev` (Ctrl+C) rồi chạy lại.
 
 ---
 
@@ -325,7 +336,8 @@ class BusRouteTest(TestCase):
 ```
 
 ```bash
-docker compose exec backend python manage.py test
+cd backend
+python manage.py test
 ```
 
 ### 7.2 Frontend (chưa có tests)

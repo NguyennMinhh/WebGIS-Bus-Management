@@ -6,6 +6,7 @@ Dùng django-environ để parse kiểu dữ liệu (bool, list, int).
 """
 
 from pathlib import Path
+import os
 import environ
 
 # ---------------------------------------------------------------------------
@@ -18,8 +19,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Trong Docker, env vars được inject trực tiếp qua docker-compose
 # ---------------------------------------------------------------------------
 env = environ.Env(
-    DEBUG=(bool, True),
-    ALLOWED_HOSTS=(list, ['*']),
+    DJANGO_DEBUG=(bool, True),
+    DJANGO_ALLOWED_HOSTS=(list, ['*']),
 )
 env_file = BASE_DIR.parent / '.env'
 if env_file.exists():
@@ -28,9 +29,9 @@ if env_file.exists():
 # ---------------------------------------------------------------------------
 # Core
 # ---------------------------------------------------------------------------
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-local-dev-key-change-me')
-DEBUG       = env('DEBUG')
-ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-local-dev-key-change-me')
+DEBUG       = env('DJANGO_DEBUG')
+ALLOWED_HOSTS = env('DJANGO_ALLOWED_HOSTS')
 
 # ---------------------------------------------------------------------------
 # Applications
@@ -94,13 +95,25 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME':     env('DB_NAME',     default='busrouting'),
-        'USER':     env('DB_USER',     default='postgres'),
-        'PASSWORD': env('DB_PASSWORD', default='postgres'),
-        'HOST':     env('DB_HOST',     default='localhost'),
-        'PORT':     env('DB_PORT',     default='5432'),
+        'NAME':     env('POSTGRES_DB',       default='busrouting'),
+        'USER':     env('POSTGRES_USER',     default='postgres'),
+        'PASSWORD': env('POSTGRES_PASSWORD', default='postgres'),
+        'HOST':     env('POSTGRES_HOST',     default='localhost'),
+        'PORT':     env('POSTGRES_PORT',     default='5432'),
     }
 }
+
+# ---------------------------------------------------------------------------
+# GeoDjango native libraries — Windows requires explicit DLL paths.
+# Also registers the parent folder so dependency DLLs can be found.
+# ---------------------------------------------------------------------------
+GDAL_LIBRARY_PATH = env('GDAL_LIBRARY_PATH', default=None)
+GEOS_LIBRARY_PATH = env('GEOS_LIBRARY_PATH', default=None)
+
+if GDAL_LIBRARY_PATH and os.name == 'nt':
+    gdal_bin = str(Path(GDAL_LIBRARY_PATH).parent)
+    os.add_dll_directory(gdal_bin)
+    os.environ['PATH'] = gdal_bin + os.pathsep + os.environ.get('PATH', '')
 
 # ---------------------------------------------------------------------------
 # CORS — cho phép React frontend (port 5173) gọi API
