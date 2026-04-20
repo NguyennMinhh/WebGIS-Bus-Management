@@ -14,13 +14,20 @@ const App = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const selection = usePointSelection()
   const [selectedRouteIndex, setSelectedRouteIndex] = useState<number | null>(null)
+  const [showBusRoutes, setShowBusRoutes] = useState(false)
+  const [showBusStops, setShowBusStops] = useState(false)
 
-  const { drawSelectionMarkers, drawRouteResults, clearRouteResults } = useMap(
+  const {
+    drawSelectionMarkers,
+    drawRouteResults,
+    clearRouteResults,
+    setOverlayLayerVisibility,
+  } = useMap(
     containerRef,
     selection.handleMapClick,
   )
 
-  const { results, status, error, emptyMessage } = useRouteSearch(
+  const { results, status, error, emptyMessage, search } = useRouteSearch(
     selection.fromPoint,
     selection.toPoint,
     selection.bufferRadius,
@@ -42,6 +49,14 @@ const App = () => {
   useEffect(() => {
     drawRouteResults(results, selectedRouteIndex)
   }, [results, selectedRouteIndex, drawRouteResults])
+
+  useEffect(() => {
+    setOverlayLayerVisibility('bus-routes', showBusRoutes)
+  }, [setOverlayLayerVisibility, showBusRoutes])
+
+  useEffect(() => {
+    setOverlayLayerVisibility('bus-stops', showBusStops)
+  }, [setOverlayLayerVisibility, showBusStops])
 
   useEffect(() => {
     console.info(`${APP_LOG_PREFIX} Route results updated.`, {
@@ -66,6 +81,30 @@ const App = () => {
     setSelectedRouteIndex(index)
   }
 
+  const handleToggleBusRoutes = () => {
+    setShowBusRoutes((currentValue) => {
+      const nextValue = !currentValue
+
+      console.info(`${APP_LOG_PREFIX} Bus route layer toggle clicked.`, {
+        visible: nextValue,
+      })
+
+      return nextValue
+    })
+  }
+
+  const handleToggleBusStops = () => {
+    setShowBusStops((currentValue) => {
+      const nextValue = !currentValue
+
+      console.info(`${APP_LOG_PREFIX} Bus stop layer toggle clicked.`, {
+        visible: nextValue,
+      })
+
+      return nextValue
+    })
+  }
+
   return (
     <div className="relative h-full w-full">
       <div className="absolute inset-0">
@@ -78,11 +117,16 @@ const App = () => {
         fromPoint={selection.fromPoint}
         toPoint={selection.toPoint}
         bufferRadius={selection.bufferRadius}
+        showBusRoutes={showBusRoutes}
+        showBusStops={showBusStops}
         isLocating={selection.isLocating}
         errorMessage={selection.errorMessage}
         onActivateMode={selection.activateMode}
         onSetFromGPS={selection.setFromGPS}
         onSetBufferRadius={selection.updateBufferRadius}
+        onToggleBusRoutes={handleToggleBusRoutes}
+        onToggleBusStops={handleToggleBusStops}
+        onSearch={search}
         onClear={handleClear}
       />
       <RouteResultPanel

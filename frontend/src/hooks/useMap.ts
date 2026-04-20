@@ -67,6 +67,8 @@ interface DrawSelectionMarkersParams {
   bufferRadius: number
 }
 
+type OverlayLayerName = 'bus-routes' | 'bus-stops'
+
 const toRgbaColor = (hexColor: string, opacity: number) => {
   const normalized = hexColor.replace('#', '')
 
@@ -88,6 +90,7 @@ export const useMap = (
   const mapRef = useRef<Map | null>(null)
   const selectionSourceRef = useRef(new VectorSource())
   const routeSourceRef = useRef(new VectorSource())
+  const routeStopSourceRef = useRef(new VectorSource())
 
   useEffect(() => {
     if (!targetRef.current || mapRef.current) return
@@ -109,6 +112,7 @@ export const useMap = (
         },
         serverType: 'geoserver',
       }),
+      visible: false,
       opacity: 0.8,
       properties: { name: 'bus-routes' },
     })
@@ -125,6 +129,7 @@ export const useMap = (
         },
         serverType: 'geoserver',
       }),
+      visible: false,
       properties: { name: 'bus-stops' },
     })
 
@@ -132,6 +137,12 @@ export const useMap = (
       source: routeSourceRef.current,
       properties: { name: 'route-results-overlay' },
       zIndex: 20,
+    })
+
+    const routeStopLayer = new VectorLayer({
+      source: routeStopSourceRef.current,
+      properties: { name: 'route-result-stops-overlay' },
+      zIndex: 25,
     })
 
     const selectionLayer = new VectorLayer({
@@ -142,7 +153,14 @@ export const useMap = (
 
     const map = new Map({
       target: targetRef.current,
-      layers: [osmLayer, busRoutesLayer, busStopsLayer, routeLayer, selectionLayer],
+      layers: [
+        osmLayer,
+        busRoutesLayer,
+        busStopsLayer,
+        routeLayer,
+        routeStopLayer,
+        selectionLayer,
+      ],
       view: new View({
         center: fromLonLat(MAP_CENTER),
         zoom: MAP_ZOOM,
@@ -157,6 +175,7 @@ export const useMap = (
       console.info(`${ROUTE_MAP_LOG_PREFIX} Map disposed.`)
       selectionSourceRef.current.clear()
       routeSourceRef.current.clear()
+      routeStopSourceRef.current.clear()
       map.setTarget(undefined)
       mapRef.current = null
     }
@@ -225,7 +244,9 @@ export const useMap = (
   const drawRouteResults = useCallback(
     (results: RouteOption[], selectedIndex: number | null) => {
       const routeSource = routeSourceRef.current
+      const routeStopSource = routeStopSourceRef.current
       routeSource.clear()
+      routeStopSource.clear()
 
       if (results.length === 0) {
         console.info(`${ROUTE_MAP_LOG_PREFIX} Cleared route results because no routes are available.`)
@@ -284,10 +305,44 @@ export const useMap = (
 
         routeSource.addFeature(feature)
 
+        option.stops.forEach((stop, stopIndex) => {
+          const isEndpoint = stopIndex === 0 || stopIndex === option.stops.length - 1
+          const stopFeature = new Feature({
+            geometry: new Point(fromLonLat([stop.lng, stop.lat])),
+          })
+
+          stopFeature.setProperties({
+            routeIndex: index,
+            routeRef: option.route.ref,
+            stopId: stop.id,
+            stopSequence: stop.sequence,
+            stopName: stop.name,
+            isEndpoint,
+          })
+          stopFeature.setStyle(
+            new Style({
+              image: new CircleStyle({
+                radius: isEndpoint ? 6 : 4,
+                fill: new Fill({
+                  color: toRgbaColor(color, opacity),
+                }),
+                stroke: new Stroke({
+                  color: '#ffffff',
+                  width: isEndpoint ? 2 : 1.5,
+                }),
+              }),
+              zIndex: isSelected ? 4 : 3,
+            }),
+          )
+
+          routeStopSource.addFeature(stopFeature)
+        })
+
         console.debug(`${ROUTE_MAP_LOG_PREFIX} Route drawn.`, {
           index,
           routeRef: option.route.ref,
           coordinateCount: option.sub_route.coordinates.length,
+          stopCount: option.stops.length,
           isSelected,
         })
       })
@@ -332,13 +387,40 @@ export const useMap = (
 
   const clearRouteResults = useCallback(() => {
     routeSourceRef.current.clear()
+    routeStopSourceRef.current.clear()
     console.info(`${ROUTE_MAP_LOG_PREFIX} Route result layer cleared.`)
   }, [])
+
+  const setOverlayLayerVisibility = useCallback(
+    (layerName: OverlayLayerName, visible: boolean) => {
+      const layer = mapRef.current
+        ?.getLayers()
+        .getArray()
+        .find((currentLayer) => currentLayer.get('name') === layerName)
+
+      if (!layer) {
+        console.warn(`${ROUTE_MAP_LOG_PREFIX} Overlay layer not found for visibility update.`, {
+          layerName,
+          visible,
+        })
+        return
+      }
+
+      layer.setVisible(visible)
+
+      console.info(`${ROUTE_MAP_LOG_PREFIX} Overlay layer visibility updated.`, {
+        layerName,
+        visible,
+      })
+    },
+    [],
+  )
 
   return {
     mapRef,
     drawSelectionMarkers,
     drawRouteResults,
     clearRouteResults,
+    setOverlayLayerVisibility,
   }
 }
