@@ -416,11 +416,37 @@ export const useMap = (
     [],
   )
 
+  const flyTo = useCallback((lng: number, lat: number, zoom = 16) => {
+    const view = mapRef.current?.getView()
+
+    if (!view) {
+      console.warn(`${ROUTE_MAP_LOG_PREFIX} Fly-to skipped because the map view is not ready.`, {
+        lng,
+        lat,
+        zoom,
+      })
+      return
+    }
+
+    console.info(`${ROUTE_MAP_LOG_PREFIX} Flying to point.`, {
+      lng,
+      lat,
+      zoom,
+    })
+
+    view.animate({
+      center: fromLonLat([lng, lat]),
+      zoom,
+      duration: 250,
+    })
+  }, [])
+
   return {
     mapRef,
     drawSelectionMarkers,
     drawRouteResults,
     clearRouteResults,
     setOverlayLayerVisibility,
+    flyTo,
   }
 }

@@ -26,6 +26,19 @@ export interface BusStop {
   lng: number
 }
 
+export interface PlaceSuggestion {
+  place_id: string
+  description: string
+  main_text: string
+  secondary_text: string
+}
+
+export interface PlaceDetail {
+  lng: number
+  lat: number
+  name: string
+}
+
 export interface BusStopInput {
   osm_id: string
   name: string

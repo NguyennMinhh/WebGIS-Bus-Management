@@ -1,4 +1,4 @@
-import type { RouteOption } from '../types'
+import type { PlaceDetail, PlaceSuggestion, RouteOption } from '../types'
 
 const RAW_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || '/api'
 const BASE_URL = RAW_BASE_URL.replace(/\/$/, '')
@@ -153,8 +153,32 @@ export const findRoute = (
   return get<RouteOption[]>(`/find-route/?${queryString.toString()}`, { signal })
 }
 
+export const placeAutocomplete = (
+  input: string,
+  signal?: AbortSignal,
+): Promise<PlaceSuggestion[]> => {
+  const queryString = new URLSearchParams({
+    input,
+  })
+
+  return get<PlaceSuggestion[]>(`/places/autocomplete/?${queryString.toString()}`, { signal })
+}
+
+export const placeDetail = (
+  placeId: string,
+  signal?: AbortSignal,
+): Promise<PlaceDetail> => {
+  const queryString = new URLSearchParams({
+    place_id: placeId,
+  })
+
+  return get<PlaceDetail>(`/places/detail/?${queryString.toString()}`, { signal })
+}
+
 export const api = {
   apiRequest,
   get,
   findRoute,
+  placeAutocomplete,
+  placeDetail,
 }

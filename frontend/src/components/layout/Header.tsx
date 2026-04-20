@@ -1,10 +1,12 @@
+import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 
 interface HeaderProps {
   variant?: 'page' | 'overlay'
+  centerContent?: ReactNode
 }
 
-const Header = ({ variant = 'page' }: HeaderProps) => {
+const Header = ({ variant = 'page', centerContent = null }: HeaderProps) => {
   const isOverlay = variant === 'overlay'
   const wrapperClassName = isOverlay
     ? 'absolute inset-x-0 top-0 z-10'
@@ -20,15 +22,27 @@ const Header = ({ variant = 'page' }: HeaderProps) => {
   return (
     <header className={wrapperClassName}>
       <div
-        className={`mx-auto flex h-14 max-w-6xl items-center gap-4 px-4 ${
-          isOverlay ? 'bg-white/90 backdrop-blur-sm shadow-sm' : ''
+        className={`mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 ${
+          isOverlay
+            ? 'min-h-14 max-w-none bg-white/90 py-3 backdrop-blur-sm shadow-sm'
+            : 'h-14'
         }`}
       >
-        <NavLink to="/" className="text-lg font-semibold text-slate-900">
+        <NavLink to="/" className="shrink-0 text-lg font-semibold text-slate-900">
           WebGIS Bus Routing
         </NavLink>
 
-        <nav className="ml-auto flex items-center gap-2">
+        {centerContent ? (
+          <div className="order-3 w-full md:order-none md:flex-1 md:px-4">
+            <div className="mx-auto w-full max-w-2xl">
+              {centerContent}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        <nav className="ml-auto flex shrink-0 items-center gap-2">
           <NavLink to="/" end className={navLinkClassName}>
             Map
           </NavLink>

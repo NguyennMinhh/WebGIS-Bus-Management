@@ -14,6 +14,8 @@ interface UsePointSelectionResult {
   activateMode: (nextMode: SelectionMode) => void
   handleMapClick: (point: LngLat) => void
   setFromGPS: () => void
+  setFromPlace: (point: LngLat) => void
+  setToPlace: (point: LngLat) => void
   updateBufferRadius: (nextRadius: number) => void
   clear: () => void
 }
@@ -27,6 +29,20 @@ export const usePointSelection = (): UsePointSelectionResult => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const geolocationRequestIdRef = useRef(0)
 
+  const applySelectedPoint = useCallback((target: Exclude<SelectionMode, null>, point: LngLat) => {
+    geolocationRequestIdRef.current += 1
+    setIsLocating(false)
+    setErrorMessage(null)
+    setMode(null)
+
+    if (target === 'from') {
+      setFromPoint(point)
+      return
+    }
+
+    setToPoint(point)
+  }, [])
+
   const activateMode = useCallback((nextMode: SelectionMode) => {
     geolocationRequestIdRef.current += 1
     setIsLocating(false)
@@ -35,22 +51,16 @@ export const usePointSelection = (): UsePointSelectionResult => {
   }, [])
 
   const handleMapClick = useCallback((point: LngLat) => {
-    geolocationRequestIdRef.current += 1
-    setIsLocating(false)
-    setErrorMessage(null)
-
     if (mode === 'from') {
-      setFromPoint(point)
-      setMode(null)
+      applySelectedPoint('from', point)
       return
     }
 
     if (mode === 'to') {
-      setToPoint(point)
-      setMode(null)
+      applySelectedPoint('to', point)
       return
     }
-  }, [mode])
+  }, [applySelectedPoint, mode])
 
   const setFromGPS = useCallback(() => {
     const requestId = geolocationRequestIdRef.current + 1
@@ -102,6 +112,14 @@ export const usePointSelection = (): UsePointSelectionResult => {
     setBufferRadius(nextRadius)
   }, [])
 
+  const setFromPlace = useCallback((point: LngLat) => {
+    applySelectedPoint('from', point)
+  }, [applySelectedPoint])
+
+  const setToPlace = useCallback((point: LngLat) => {
+    applySelectedPoint('to', point)
+  }, [applySelectedPoint])
+
   const clear = useCallback(() => {
     geolocationRequestIdRef.current += 1
     setIsLocating(false)
@@ -121,6 +139,8 @@ export const usePointSelection = (): UsePointSelectionResult => {
     activateMode,
     handleMapClick,
     setFromGPS,
+    setFromPlace,
+    setToPlace,
     updateBufferRadius,
     clear,
   }

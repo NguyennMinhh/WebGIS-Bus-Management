@@ -1,7 +1,10 @@
 import json
 import logging
 
+import requests
+from django.conf import settings
 from django.contrib.gis.geos import Point
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from django.db import connection
 from django.db.models import Max
@@ -25,6 +28,11 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
+GOONG_PLACE_API_BASE_URL = 'https://rsapi.goong.io/Place'
+GOONG_REQUEST_TIMEOUT_SECONDS = 5
+HANOI_BIAS_LOCATION = '21.0285,105.8542'
+HANOI_BIAS_RADIUS_METERS = 30000
+
 
 def _build_stop_payload(stop):
     return {
@@ -33,6 +41,55 @@ def _build_stop_payload(stop):
         'lat': stop.location.y,
         'lng': stop.location.x,
     }
+
+
+def _call_goong_api(endpoint, params, allowed_statuses=('OK',)):
+    if not settings.GOONG_API_KEY:
+        raise ImproperlyConfigured('GOONG_API_KEY is not configured.')
+
+    url = f'{GOONG_PLACE_API_BASE_URL}/{endpoint}'
+
+    try:
+        response = requests.get(
+            url,
+            params={
+                **params,
+                'api_key': settings.GOONG_API_KEY,
+            },
+            timeout=GOONG_REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException as exc:
+        logger.exception('[GoongPlaces] Upstream request failed.', extra={
+            'endpoint': endpoint,
+            'params': params,
+        })
+        raise RuntimeError('Goong request failed.') from exc
+    except ValueError as exc:
+        logger.exception('[GoongPlaces] Upstream returned invalid JSON.', extra={
+            'endpoint': endpoint,
+            'params': params,
+        })
+        raise RuntimeError('Goong response was not valid JSON.') from exc
+
+    if not isinstance(payload, dict):
+        logger.error('[GoongPlaces] Upstream returned an unexpected payload shape.', extra={
+            'endpoint': endpoint,
+            'payload_type': type(payload).__name__,
+        })
+        raise RuntimeError('Goong response payload is invalid.')
+
+    goong_status = payload.get('status')
+    if isinstance(goong_status, str) and goong_status not in allowed_statuses:
+        logger.error('[GoongPlaces] Upstream returned an unsuccessful status.', extra={
+            'endpoint': endpoint,
+            'goong_status': goong_status,
+            'params': params,
+        })
+        raise RuntimeError('Goong returned an unsuccessful response.')
+
+    return payload
 
 
 def _find_nearby_stop_ids(point, buffer_m):
@@ -143,6 +200,158 @@ def stop_list(request):
 
     serializer = BusStopSerializer(stops, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+def place_autocomplete(request):
+    input_value = request.query_params.get('input', '').strip()
+
+    if not input_value:
+        return Response(
+            {'error': 'Query param "input" is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        payload = _call_goong_api(
+            'AutoComplete',
+            {
+                'input': input_value,
+                'location': HANOI_BIAS_LOCATION,
+                'radius': HANOI_BIAS_RADIUS_METERS,
+            },
+            allowed_statuses=('OK', 'ZERO_RESULTS'),
+        )
+    except ImproperlyConfigured:
+        logger.error('[GoongPlaces] Autocomplete requested without GOONG_API_KEY configured.')
+        return Response(
+            {'error': 'GOONG_API_KEY is not configured.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    except RuntimeError as exc:
+        logger.warning('[GoongPlaces] Autocomplete proxy failed.', extra={
+            'input': input_value,
+            'error': str(exc),
+        })
+        return Response(
+            {'error': 'Place autocomplete is temporarily unavailable.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    raw_predictions = payload.get('predictions', [])
+    if not isinstance(raw_predictions, list):
+        logger.error('[GoongPlaces] Autocomplete predictions payload is invalid.', extra={
+            'input': input_value,
+            'payload': payload,
+        })
+        return Response(
+            {'error': 'Place autocomplete returned an invalid payload.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    predictions = []
+
+    for prediction in raw_predictions:
+        if not isinstance(prediction, dict):
+            continue
+
+        structured_formatting = prediction.get('structured_formatting')
+        if not isinstance(structured_formatting, dict):
+            structured_formatting = {}
+
+        place_id = prediction.get('place_id')
+        description = prediction.get('description')
+
+        if not isinstance(place_id, str) or not isinstance(description, str):
+            continue
+
+        predictions.append(
+            {
+                'place_id': place_id,
+                'description': description,
+                'main_text': structured_formatting.get('main_text', description),
+                'secondary_text': structured_formatting.get('secondary_text', ''),
+            },
+        )
+
+    return Response(predictions)
+
+
+@api_view(['GET'])
+def place_detail(request):
+    place_id = request.query_params.get('place_id', '').strip()
+
+    if not place_id:
+        return Response(
+            {'error': 'Query param "place_id" is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        payload = _call_goong_api(
+            'Detail',
+            {'place_id': place_id},
+            allowed_statuses=('OK',),
+        )
+    except ImproperlyConfigured:
+        logger.error('[GoongPlaces] Place detail requested without GOONG_API_KEY configured.')
+        return Response(
+            {'error': 'GOONG_API_KEY is not configured.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+    except RuntimeError as exc:
+        logger.warning('[GoongPlaces] Place detail proxy failed.', extra={
+            'place_id': place_id,
+            'error': str(exc),
+        })
+        return Response(
+            {'error': 'Place detail is temporarily unavailable.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    result = payload.get('result')
+    if not isinstance(result, dict):
+        logger.error('[GoongPlaces] Place detail result payload is invalid.', extra={
+            'place_id': place_id,
+            'payload': payload,
+        })
+        return Response(
+            {'error': 'Place detail returned an invalid payload.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    geometry = result.get('geometry')
+    if not isinstance(geometry, dict):
+        geometry = {}
+
+    location = geometry.get('location')
+    if not isinstance(location, dict):
+        location = {}
+
+    lng = location.get('lng')
+    lat = location.get('lat')
+    name = result.get('name') or result.get('formatted_address') or ''
+
+    if not isinstance(lng, (int, float)) or not isinstance(lat, (int, float)):
+        logger.error('[GoongPlaces] Place detail is missing coordinates.', extra={
+            'place_id': place_id,
+            'payload': payload,
+        })
+        return Response(
+            {'error': 'Place detail is missing coordinates.'},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    if not isinstance(name, str):
+        name = ''
+
+    return Response(
+        {
+            'lng': float(lng),
+            'lat': float(lat),
+            'name': name,
+        },
+    )
 
 
 @api_view(['GET'])

@@ -9,6 +9,8 @@ manage_router.register('routes', views.BusRouteViewSet, basename='manage-route')
 
 urlpatterns = [
     path('find-route/', views.find_route, name='find-route'),
+    path('places/autocomplete/', views.place_autocomplete, name='place-autocomplete'),
+    path('places/detail/', views.place_detail, name='place-detail'),
     path('stops/', views.stop_list, name='stop-list'),
     path('routes/', views.route_list, name='route-list'),
     path('manage/', include(manage_router.urls)),
