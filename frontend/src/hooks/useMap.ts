@@ -6,6 +6,7 @@ import Map from 'ol/Map'
 import type MapBrowserEvent from 'ol/MapBrowserEvent'
 import View from 'ol/View'
 import CircleGeometry from 'ol/geom/Circle'
+import LineString from 'ol/geom/LineString'
 import Point from 'ol/geom/Point'
 import { fromCircle } from 'ol/geom/Polygon'
 import TileLayer from 'ol/layer/Tile'
@@ -21,15 +22,18 @@ import Style from 'ol/style/Style'
 import 'ol/ol.css'
 
 import {
-  MAP_CENTER,
-  MAP_ZOOM,
+  BUS_ROUTES_SLD_BODY,
+  BUS_STOPS_SLD_BODY,
   GEOSERVER_WMS_URL,
   LAYER_BUS_ROUTES,
   LAYER_BUS_STOPS,
-  BUS_ROUTES_SLD_BODY,
-  BUS_STOPS_SLD_BODY,
+  MAP_CENTER,
+  MAP_ZOOM,
+  ROUTE_COLORS,
 } from '../utils/mapConfig'
-import type { LngLat } from '../types'
+import type { LngLat, RouteOption } from '../types'
+
+const ROUTE_MAP_LOG_PREFIX = '[RouteMap]'
 
 const fromMarkerStyle = new Style({
   image: new CircleStyle({
@@ -63,12 +67,27 @@ interface DrawSelectionMarkersParams {
   bufferRadius: number
 }
 
+const toRgbaColor = (hexColor: string, opacity: number) => {
+  const normalized = hexColor.replace('#', '')
+
+  if (normalized.length !== 6) {
+    return hexColor
+  }
+
+  const red = Number.parseInt(normalized.slice(0, 2), 16)
+  const green = Number.parseInt(normalized.slice(2, 4), 16)
+  const blue = Number.parseInt(normalized.slice(4, 6), 16)
+
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`
+}
+
 export const useMap = (
   targetRef: RefObject<HTMLDivElement>,
   onMapClick?: (point: LngLat) => void,
 ) => {
   const mapRef = useRef<Map | null>(null)
   const selectionSourceRef = useRef(new VectorSource())
+  const routeSourceRef = useRef(new VectorSource())
 
   useEffect(() => {
     if (!targetRef.current || mapRef.current) return
@@ -109,15 +128,21 @@ export const useMap = (
       properties: { name: 'bus-stops' },
     })
 
+    const routeLayer = new VectorLayer({
+      source: routeSourceRef.current,
+      properties: { name: 'route-results-overlay' },
+      zIndex: 20,
+    })
+
     const selectionLayer = new VectorLayer({
       source: selectionSourceRef.current,
       properties: { name: 'selection-overlay' },
-      zIndex: 10,
+      zIndex: 30,
     })
 
     const map = new Map({
       target: targetRef.current,
-      layers: [osmLayer, busRoutesLayer, busStopsLayer, selectionLayer],
+      layers: [osmLayer, busRoutesLayer, busStopsLayer, routeLayer, selectionLayer],
       view: new View({
         center: fromLonLat(MAP_CENTER),
         zoom: MAP_ZOOM,
@@ -126,8 +151,12 @@ export const useMap = (
 
     mapRef.current = map
 
+    console.info(`${ROUTE_MAP_LOG_PREFIX} Map initialized.`)
+
     return () => {
+      console.info(`${ROUTE_MAP_LOG_PREFIX} Map disposed.`)
       selectionSourceRef.current.clear()
+      routeSourceRef.current.clear()
       map.setTarget(undefined)
       mapRef.current = null
     }
@@ -142,6 +171,7 @@ export const useMap = (
       const [lng, lat] = toLonLat(event.coordinate)
       const point: LngLat = [lng, lat]
 
+      console.info(`${ROUTE_MAP_LOG_PREFIX} Map click captured.`, { point })
       onMapClick(point)
     }
 
@@ -156,6 +186,12 @@ export const useMap = (
     ({ from, to, bufferRadius }: DrawSelectionMarkersParams) => {
       const source = selectionSourceRef.current
       source.clear()
+
+      console.info(`${ROUTE_MAP_LOG_PREFIX} Redrawing selection markers.`, {
+        from,
+        to,
+        bufferRadius,
+      })
 
       const drawSinglePoint = (
         point: LngLat,
@@ -186,5 +222,123 @@ export const useMap = (
     [],
   )
 
-  return { mapRef, drawSelectionMarkers }
+  const drawRouteResults = useCallback(
+    (results: RouteOption[], selectedIndex: number | null) => {
+      const routeSource = routeSourceRef.current
+      routeSource.clear()
+
+      if (results.length === 0) {
+        console.info(`${ROUTE_MAP_LOG_PREFIX} Cleared route results because no routes are available.`)
+        return
+      }
+
+      const hasSelectedRoute =
+        selectedIndex !== null && selectedIndex >= 0 && selectedIndex < results.length
+
+      console.info(`${ROUTE_MAP_LOG_PREFIX} Drawing route results.`, {
+        resultCount: results.length,
+        selectedIndex,
+      })
+
+      results.forEach((option, index) => {
+        if (option.sub_route.type !== 'LineString') {
+          console.warn(`${ROUTE_MAP_LOG_PREFIX} Skipped route with unsupported geometry type.`, {
+            index,
+            routeRef: option.route.ref,
+            geometryType: option.sub_route.type,
+          })
+          return
+        }
+
+        if (option.sub_route.coordinates.length < 2) {
+          console.warn(`${ROUTE_MAP_LOG_PREFIX} Skipped route with too few coordinates.`, {
+            index,
+            routeRef: option.route.ref,
+          })
+          return
+        }
+
+        const color = ROUTE_COLORS[index % ROUTE_COLORS.length]
+        const isSelected = hasSelectedRoute && selectedIndex === index
+        const opacity = !hasSelectedRoute || isSelected ? 1 : 0.3
+        const width = isSelected ? 6 : 4
+        const geometry = new LineString(
+          option.sub_route.coordinates.map((coordinate) => fromLonLat(coordinate)),
+        )
+        const feature = new Feature({ geometry })
+
+        feature.setProperties({
+          routeIndex: index,
+          routeRef: option.route.ref,
+          distanceM: option.distance_m,
+        })
+        feature.setStyle(
+          new Style({
+            stroke: new Stroke({
+              color: toRgbaColor(color, opacity),
+              width,
+            }),
+            zIndex: isSelected ? 2 : 1,
+          }),
+        )
+
+        routeSource.addFeature(feature)
+
+        console.debug(`${ROUTE_MAP_LOG_PREFIX} Route drawn.`, {
+          index,
+          routeRef: option.route.ref,
+          coordinateCount: option.sub_route.coordinates.length,
+          isSelected,
+        })
+      })
+
+      if (!hasSelectedRoute) {
+        return
+      }
+
+      const selectedFeature = routeSource
+        .getFeatures()
+        .find((feature) => feature.get('routeIndex') === selectedIndex)
+
+      if (!selectedFeature) {
+        console.warn(`${ROUTE_MAP_LOG_PREFIX} Selected route feature was not found after draw.`, {
+          selectedIndex,
+        })
+        return
+      }
+
+      const geometry = selectedFeature.getGeometry()
+
+      if (!geometry) {
+        console.warn(`${ROUTE_MAP_LOG_PREFIX} Selected route feature has no geometry.`, {
+          selectedIndex,
+        })
+        return
+      }
+
+      console.info(`${ROUTE_MAP_LOG_PREFIX} Fitting map to selected route.`, {
+        selectedIndex,
+        routeRef: selectedFeature.get('routeRef'),
+      })
+
+      mapRef.current?.getView().fit(geometry.getExtent(), {
+        padding: [80, 440, 80, 80],
+        maxZoom: 16,
+        duration: 250,
+      })
+    },
+    [],
+  )
+
+  const clearRouteResults = useCallback(() => {
+    routeSourceRef.current.clear()
+    console.info(`${ROUTE_MAP_LOG_PREFIX} Route result layer cleared.`)
+  }, [])
+
+  return {
+    mapRef,
+    drawSelectionMarkers,
+    drawRouteResults,
+    clearRouteResults,
+  }
 }

@@ -1,15 +1,30 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import Header from './components/layout/Header'
 import MapView from './components/map/MapView'
 import { SelectionControls } from './components/map/SelectionControls'
+import { RouteResultPanel } from './components/search/RouteResultPanel'
 import { useMap } from './hooks/useMap'
 import { usePointSelection } from './hooks/usePointSelection'
+import { useRouteSearch } from './hooks/useRouteSearch'
+
+const APP_LOG_PREFIX = '[App]'
 
 const App = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const selection = usePointSelection()
-  const { drawSelectionMarkers } = useMap(containerRef, selection.handleMapClick)
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState<number | null>(null)
+
+  const { drawSelectionMarkers, drawRouteResults, clearRouteResults } = useMap(
+    containerRef,
+    selection.handleMapClick,
+  )
+
+  const { results, status, error, emptyMessage } = useRouteSearch(
+    selection.fromPoint,
+    selection.toPoint,
+    selection.bufferRadius,
+  )
 
   useEffect(() => {
     drawSelectionMarkers({
@@ -23,6 +38,33 @@ const App = () => {
     selection.bufferRadius,
     drawSelectionMarkers,
   ])
+
+  useEffect(() => {
+    drawRouteResults(results, selectedRouteIndex)
+  }, [results, selectedRouteIndex, drawRouteResults])
+
+  useEffect(() => {
+    console.info(`${APP_LOG_PREFIX} Route results updated.`, {
+      resultCount: results.length,
+      status,
+    })
+    setSelectedRouteIndex(null)
+  }, [results, status])
+
+  const handleClear = () => {
+    console.info(`${APP_LOG_PREFIX} Clearing selected points and route results.`)
+    selection.clear()
+    clearRouteResults()
+    setSelectedRouteIndex(null)
+  }
+
+  const handleRouteSelect = (index: number) => {
+    console.info(`${APP_LOG_PREFIX} Route card clicked.`, {
+      index,
+      routeRef: results[index]?.route.ref,
+    })
+    setSelectedRouteIndex(index)
+  }
 
   return (
     <div className="relative h-full w-full">
@@ -41,7 +83,15 @@ const App = () => {
         onActivateMode={selection.activateMode}
         onSetFromGPS={selection.setFromGPS}
         onSetBufferRadius={selection.updateBufferRadius}
-        onClear={selection.clear}
+        onClear={handleClear}
+      />
+      <RouteResultPanel
+        results={results}
+        status={status}
+        error={error}
+        emptyMessage={emptyMessage}
+        selectedIndex={selectedRouteIndex}
+        onSelect={handleRouteSelect}
       />
     </div>
   )

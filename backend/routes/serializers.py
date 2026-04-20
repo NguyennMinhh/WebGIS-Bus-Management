@@ -1,16 +1,9 @@
-# ---------------------------------------------------------------------------
-# serializers.py — DRF serializers cho Route Finder API
-# ---------------------------------------------------------------------------
-
 from rest_framework import serializers
+
 from .models import BusRoute, BusStop, RouteStop
 
 
 class BusStopSerializer(serializers.ModelSerializer):
-    """
-    Serializer cơ bản cho trạm dừng.
-    Dùng trong cả danh sách trạm trung gian lẫn from_stop/to_stop của kết quả tìm tuyến.
-    """
     lat = serializers.SerializerMethodField()
     lng = serializers.SerializerMethodField()
 
@@ -19,7 +12,6 @@ class BusStopSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'lat', 'lng']
 
     def get_lat(self, obj):
-        # location là PointField: x = longitude, y = latitude
         return obj.location.y if obj.location else None
 
     def get_lng(self, obj):
@@ -27,10 +19,6 @@ class BusStopSerializer(serializers.ModelSerializer):
 
 
 class BusRouteInfoSerializer(serializers.ModelSerializer):
-    """
-    Thông tin mô tả tuyến (không có geometry path).
-    Các field OSM có thể rỗng (blank=True trong model) → trả về null nếu rỗng.
-    """
     name = serializers.SerializerMethodField()
     charge = serializers.SerializerMethodField()
     interval = serializers.SerializerMethodField()
@@ -40,7 +28,6 @@ class BusRouteInfoSerializer(serializers.ModelSerializer):
         fields = ['id', 'ref', 'name', 'charge', 'interval']
 
     def _none_if_blank(self, value):
-        """Trả về None thay vì "" để frontend dễ kiểm tra null."""
         return value if value else None
 
     def get_name(self, obj):
@@ -54,10 +41,6 @@ class BusRouteInfoSerializer(serializers.ModelSerializer):
 
 
 class RouteStopWithSequenceSerializer(serializers.ModelSerializer):
-    """
-    Trạm trung gian kèm số thứ tự trong tuyến.
-    Dùng trong danh sách stops[] của RouteOption.
-    """
     id = serializers.IntegerField(source='stop.id')
     name = serializers.CharField(source='stop.name')
     lat = serializers.SerializerMethodField()
@@ -72,3 +55,36 @@ class RouteStopWithSequenceSerializer(serializers.ModelSerializer):
 
     def get_lng(self, obj):
         return obj.stop.location.x if obj.stop.location else None
+
+
+class BusStopBasicSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField(allow_blank=True)
+    lat = serializers.FloatField()
+    lng = serializers.FloatField()
+
+
+class RouteInfoSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    ref = serializers.CharField()
+    name = serializers.CharField(allow_null=True)
+    charge = serializers.CharField(allow_null=True)
+    interval = serializers.CharField(allow_null=True)
+
+
+class RouteStopSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField(allow_blank=True)
+    lat = serializers.FloatField()
+    lng = serializers.FloatField()
+    sequence = serializers.IntegerField()
+
+
+class RouteOptionSerializer(serializers.Serializer):
+    route = RouteInfoSerializer()
+    from_stop = BusStopBasicSerializer()
+    to_stop = BusStopBasicSerializer()
+    stop_count = serializers.IntegerField()
+    distance_m = serializers.IntegerField()
+    stops = RouteStopSerializer(many=True)
+    sub_route = serializers.DictField()
