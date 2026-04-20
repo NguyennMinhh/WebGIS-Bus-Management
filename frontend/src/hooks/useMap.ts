@@ -1,11 +1,24 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import type { RefObject } from 'react'
+
+import Feature from 'ol/Feature'
 import Map from 'ol/Map'
+import type MapBrowserEvent from 'ol/MapBrowserEvent'
 import View from 'ol/View'
-import TileLayer from 'ol/layer/Tile'
-import OSM from 'ol/source/OSM'
+import CircleGeometry from 'ol/geom/Circle'
+import Point from 'ol/geom/Point'
+import { fromCircle } from 'ol/geom/Polygon'
 import ImageLayer from 'ol/layer/Image'
+import TileLayer from 'ol/layer/Tile'
+import VectorLayer from 'ol/layer/Vector'
+import OSM from 'ol/source/OSM'
 import ImageWMS from 'ol/source/ImageWMS'
-import { fromLonLat } from 'ol/proj'
+import VectorSource from 'ol/source/Vector'
+import { fromLonLat, toLonLat } from 'ol/proj'
+import CircleStyle from 'ol/style/Circle'
+import Fill from 'ol/style/Fill'
+import Stroke from 'ol/style/Stroke'
+import Style from 'ol/style/Style'
 import 'ol/ol.css'
 
 import {
@@ -15,37 +28,57 @@ import {
   LAYER_BUS_ROUTES,
   LAYER_BUS_STOPS,
 } from '../utils/mapConfig'
+import type { LngLat } from '../types'
 
-/**
- * useMap — Custom hook khởi tạo và quản lý OpenLayers Map instance.
- *
- * Cách dùng:
- *   const divRef = useRef<HTMLDivElement>(null)
- *   const { mapRef } = useMap(divRef)
- *   return <div ref={divRef} className="w-full h-full" />
- *
- * @param targetRef - ref gắn vào <div> container của map
- * @returns mapRef - ref tới Map instance (dùng để thêm layer, listener...)
- */
-export const useMap = (targetRef: React.RefObject<HTMLDivElement>) => {
+const fromMarkerStyle = new Style({
+  image: new CircleStyle({
+    radius: 8,
+    fill: new Fill({ color: '#16a34a' }),
+    stroke: new Stroke({ color: '#ffffff', width: 2 }),
+  }),
+})
+
+const toMarkerStyle = new Style({
+  image: new CircleStyle({
+    radius: 8,
+    fill: new Fill({ color: '#dc2626' }),
+    stroke: new Stroke({ color: '#ffffff', width: 2 }),
+  }),
+})
+
+const fromBufferStyle = new Style({
+  stroke: new Stroke({ color: '#16a34a', width: 2, lineDash: [6, 4] }),
+  fill: new Fill({ color: 'rgba(22, 163, 74, 0.10)' }),
+})
+
+const toBufferStyle = new Style({
+  stroke: new Stroke({ color: '#dc2626', width: 2, lineDash: [6, 4] }),
+  fill: new Fill({ color: 'rgba(220, 38, 38, 0.10)' }),
+})
+
+interface DrawSelectionMarkersParams {
+  from: LngLat | null
+  to: LngLat | null
+  bufferRadius: number
+}
+
+export const useMap = (
+  targetRef: RefObject<HTMLDivElement>,
+  onMapClick?: (point: LngLat) => void,
+) => {
   const mapRef = useRef<Map | null>(null)
+  const selectionSourceRef = useRef(new VectorSource())
 
   useEffect(() => {
-    // Guard: chỉ init 1 lần
     if (!targetRef.current || mapRef.current) return
 
-    // ------------------------------------------------------------------
-    // Layer 1: OSM base map (nền đường xá, tên địa danh)
-    // ------------------------------------------------------------------
+    console.log('[Map] Step 1: initialize OpenLayers map')
+
     const osmLayer = new TileLayer({
       source: new OSM(),
       properties: { name: 'osm-base' },
     })
 
-    // ------------------------------------------------------------------
-    // Layer 2: WMS — Tuyến xe buýt (từ GeoServer → PostGIS)
-    // Chú ý: layer này chỉ hiển thị SAU KHI đã cấu hình GeoServer
-    // ------------------------------------------------------------------
     const busRoutesLayer = new ImageLayer({
       source: new ImageWMS({
         url: GEOSERVER_WMS_URL,
@@ -61,9 +94,6 @@ export const useMap = (targetRef: React.RefObject<HTMLDivElement>) => {
       properties: { name: 'bus-routes' },
     })
 
-    // ------------------------------------------------------------------
-    // Layer 3: WMS — Trạm dừng xe buýt
-    // ------------------------------------------------------------------
     const busStopsLayer = new ImageLayer({
       source: new ImageWMS({
         url: GEOSERVER_WMS_URL,
@@ -78,13 +108,15 @@ export const useMap = (targetRef: React.RefObject<HTMLDivElement>) => {
       properties: { name: 'bus-stops' },
     })
 
-    // ------------------------------------------------------------------
-    // Khởi tạo Map
-    // fromLonLat([lng, lat]) chuyển từ WGS84 sang Web Mercator (EPSG:3857)
-    // ------------------------------------------------------------------
+    const selectionLayer = new VectorLayer({
+      source: selectionSourceRef.current,
+      properties: { name: 'selection-overlay' },
+      zIndex: 10,
+    })
+
     const map = new Map({
       target: targetRef.current,
-      layers: [osmLayer, busRoutesLayer, busStopsLayer],
+      layers: [osmLayer, busRoutesLayer, busStopsLayer, selectionLayer],
       view: new View({
         center: fromLonLat(MAP_CENTER),
         zoom: MAP_ZOOM,
@@ -92,13 +124,81 @@ export const useMap = (targetRef: React.RefObject<HTMLDivElement>) => {
     })
 
     mapRef.current = map
+    console.log('[Map] Step 2: map is ready')
 
-    // Cleanup khi component unmount
     return () => {
+      console.log('[Map] Step 3: destroy map instance')
+      selectionSourceRef.current.clear()
       map.setTarget(undefined)
       mapRef.current = null
     }
   }, [targetRef])
 
-  return { mapRef }
+  useEffect(() => {
+    const map = mapRef.current
+
+    if (!map || !onMapClick) return
+
+    console.log('[Map] Step 4: attach click listener')
+
+    const handleClick = (event: MapBrowserEvent) => {
+      const [lng, lat] = toLonLat(event.coordinate)
+      const point: LngLat = [lng, lat]
+
+      console.log('[Map] Step 5: convert map click to lng/lat', { point })
+      onMapClick(point)
+    }
+
+    map.on('click', handleClick)
+
+    return () => {
+      console.log('[Map] Step 6: detach click listener')
+      map.un('click', handleClick)
+    }
+  }, [onMapClick])
+
+  const drawSelectionMarkers = useCallback(
+    ({ from, to, bufferRadius }: DrawSelectionMarkersParams) => {
+      console.log('[Map] Step 7: redraw selection overlay', {
+        hasFrom: Boolean(from),
+        hasTo: Boolean(to),
+        bufferRadius,
+      })
+
+      const source = selectionSourceRef.current
+      source.clear()
+
+      const drawSinglePoint = (
+        point: LngLat,
+        markerStyle: Style,
+        bufferStyle: Style,
+        label: 'from' | 'to',
+      ) => {
+        const center = fromLonLat(point)
+        const markerFeature = new Feature({
+          geometry: new Point(center),
+        })
+        const bufferFeature = new Feature({
+          geometry: fromCircle(new CircleGeometry(center, bufferRadius), 64),
+        })
+
+        markerFeature.setStyle(markerStyle)
+        bufferFeature.setStyle(bufferStyle)
+        source.addFeatures([bufferFeature, markerFeature])
+
+        console.log('[Map] Step 8: draw selection feature', { label, point })
+      }
+
+      if (from) {
+        drawSinglePoint(from, fromMarkerStyle, fromBufferStyle, 'from')
+      }
+
+      if (to) {
+        drawSinglePoint(to, toMarkerStyle, toBufferStyle, 'to')
+      }
+    },
+    [],
+  )
+
+  return { mapRef, drawSelectionMarkers }
 }

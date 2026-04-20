@@ -1,26 +1,53 @@
-import Header from './components/layout/Header'
-import { MapView } from './components/map'
+import { useEffect, useRef } from 'react'
 
-/**
- * App — Root component.
- *
- * Layout:
- *   - Header: fixed, z-10, không che map
- *   - MapView: chiếm toàn màn hình (position absolute, inset-0)
- *
- * Tất cả tính năng mới (search, sidebar, panels) sẽ được thêm
- * như các overlay component nằm trên MapView.
- */
+import Header from './components/layout/Header'
+import MapView from './components/map/MapView'
+import { SelectionControls } from './components/map/SelectionControls'
+import { useMap } from './hooks/useMap'
+import { usePointSelection } from './hooks/usePointSelection'
+
 const App = () => {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const selection = usePointSelection()
+  const { drawSelectionMarkers } = useMap(containerRef, selection.handleMapClick)
+
+  useEffect(() => {
+    console.log('[App] Step 9: sync selection state to map overlay', {
+      fromPoint: selection.fromPoint,
+      toPoint: selection.toPoint,
+      bufferRadius: selection.bufferRadius,
+    })
+
+    drawSelectionMarkers({
+      from: selection.fromPoint,
+      to: selection.toPoint,
+      bufferRadius: selection.bufferRadius,
+    })
+  }, [
+    selection.fromPoint,
+    selection.toPoint,
+    selection.bufferRadius,
+    drawSelectionMarkers,
+  ])
+
   return (
-    <div className="relative w-full h-full">
-      {/* Map ở dưới cùng, chiếm toàn màn hình */}
+    <div className="relative h-full w-full">
       <div className="absolute inset-0">
-        <MapView />
+        <MapView containerRef={containerRef} mode={selection.mode} />
       </div>
 
-      {/* Header overlay phía trên map */}
       <Header />
+      <SelectionControls
+        mode={selection.mode}
+        fromPoint={selection.fromPoint}
+        toPoint={selection.toPoint}
+        bufferRadius={selection.bufferRadius}
+        errorMessage={selection.errorMessage}
+        onActivateMode={selection.activateMode}
+        onSetFromGPS={selection.setFromGPS}
+        onSetBufferRadius={selection.updateBufferRadius}
+        onClear={selection.clear}
+      />
     </div>
   )
 }
