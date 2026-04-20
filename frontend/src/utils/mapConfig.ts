@@ -36,7 +36,7 @@ export const BUS_ROUTE_WIDTH = 5
 export const BUS_STOP_COLOR = '#dc2626'
 export const BUS_STOP_ICON = 'circle'
 export const BUS_STOP_ICON_SIZE = 10
-export const ROUTE_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899']
+export const ROUTE_COLORS = ['#1d4ed8', '#b45309', '#15803d', '#6d28d9', '#be123c']
 
 export const BUS_ROUTES_SLD_BODY = `
 <StyledLayerDescriptor version="1.0.0"
