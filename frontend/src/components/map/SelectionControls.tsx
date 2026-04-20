@@ -6,6 +6,7 @@ interface SelectionControlsProps {
   fromPoint: LngLat | null
   toPoint: LngLat | null
   bufferRadius: number
+  isLocating: boolean
   errorMessage: string | null
   onActivateMode: (mode: SelectionMode) => void
   onSetFromGPS: () => void
@@ -41,6 +42,7 @@ export const SelectionControls = ({
   fromPoint,
   toPoint,
   bufferRadius,
+  isLocating,
   errorMessage,
   onActivateMode,
   onSetFromGPS,
@@ -78,9 +80,10 @@ export const SelectionControls = ({
         <button
           type="button"
           onClick={onSetFromGPS}
-          className="w-full rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200"
+          disabled={isLocating}
+          className="w-full rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Use my location
+          {isLocating ? 'Locating...' : 'Use my location'}
         </button>
       </section>
 

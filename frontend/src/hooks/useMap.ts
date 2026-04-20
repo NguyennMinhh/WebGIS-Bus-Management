@@ -72,8 +72,6 @@ export const useMap = (
   useEffect(() => {
     if (!targetRef.current || mapRef.current) return
 
-    console.log('[Map] Step 1: initialize OpenLayers map')
-
     const osmLayer = new TileLayer({
       source: new OSM(),
       properties: { name: 'osm-base' },
@@ -124,10 +122,8 @@ export const useMap = (
     })
 
     mapRef.current = map
-    console.log('[Map] Step 2: map is ready')
 
     return () => {
-      console.log('[Map] Step 3: destroy map instance')
       selectionSourceRef.current.clear()
       map.setTarget(undefined)
       mapRef.current = null
@@ -139,32 +135,22 @@ export const useMap = (
 
     if (!map || !onMapClick) return
 
-    console.log('[Map] Step 4: attach click listener')
-
     const handleClick = (event: MapBrowserEvent) => {
       const [lng, lat] = toLonLat(event.coordinate)
       const point: LngLat = [lng, lat]
 
-      console.log('[Map] Step 5: convert map click to lng/lat', { point })
       onMapClick(point)
     }
 
     map.on('click', handleClick)
 
     return () => {
-      console.log('[Map] Step 6: detach click listener')
       map.un('click', handleClick)
     }
   }, [onMapClick])
 
   const drawSelectionMarkers = useCallback(
     ({ from, to, bufferRadius }: DrawSelectionMarkersParams) => {
-      console.log('[Map] Step 7: redraw selection overlay', {
-        hasFrom: Boolean(from),
-        hasTo: Boolean(to),
-        bufferRadius,
-      })
-
       const source = selectionSourceRef.current
       source.clear()
 
@@ -172,7 +158,6 @@ export const useMap = (
         point: LngLat,
         markerStyle: Style,
         bufferStyle: Style,
-        label: 'from' | 'to',
       ) => {
         const center = fromLonLat(point)
         const markerFeature = new Feature({
@@ -185,16 +170,14 @@ export const useMap = (
         markerFeature.setStyle(markerStyle)
         bufferFeature.setStyle(bufferStyle)
         source.addFeatures([bufferFeature, markerFeature])
-
-        console.log('[Map] Step 8: draw selection feature', { label, point })
       }
 
       if (from) {
-        drawSinglePoint(from, fromMarkerStyle, fromBufferStyle, 'from')
+        drawSinglePoint(from, fromMarkerStyle, fromBufferStyle)
       }
 
       if (to) {
-        drawSinglePoint(to, toMarkerStyle, toBufferStyle, 'to')
+        drawSinglePoint(to, toMarkerStyle, toBufferStyle)
       }
     },
     [],

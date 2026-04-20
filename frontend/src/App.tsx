@@ -12,12 +12,6 @@ const App = () => {
   const { drawSelectionMarkers } = useMap(containerRef, selection.handleMapClick)
 
   useEffect(() => {
-    console.log('[App] Step 9: sync selection state to map overlay', {
-      fromPoint: selection.fromPoint,
-      toPoint: selection.toPoint,
-      bufferRadius: selection.bufferRadius,
-    })
-
     drawSelectionMarkers({
       from: selection.fromPoint,
       to: selection.toPoint,
@@ -42,6 +36,7 @@ const App = () => {
         fromPoint={selection.fromPoint}
         toPoint={selection.toPoint}
         bufferRadius={selection.bufferRadius}
+        isLocating={selection.isLocating}
         errorMessage={selection.errorMessage}
         onActivateMode={selection.activateMode}
         onSetFromGPS={selection.setFromGPS}

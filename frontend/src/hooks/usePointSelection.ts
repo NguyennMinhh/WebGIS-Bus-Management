@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import type { LngLat } from '../types'
 
@@ -9,6 +9,7 @@ interface UsePointSelectionResult {
   toPoint: LngLat | null
   mode: SelectionMode
   bufferRadius: number
+  isLocating: boolean
   errorMessage: string | null
   activateMode: (nextMode: SelectionMode) => void
   handleMapClick: (point: LngLat) => void
@@ -22,68 +23,72 @@ export const usePointSelection = (): UsePointSelectionResult => {
   const [toPoint, setToPoint] = useState<LngLat | null>(null)
   const [mode, setMode] = useState<SelectionMode>(null)
   const [bufferRadius, setBufferRadius] = useState(1000)
+  const [isLocating, setIsLocating] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const geolocationRequestIdRef = useRef(0)
 
   const activateMode = useCallback((nextMode: SelectionMode) => {
-    console.log('[PointSelection] Step 1: toggle selection mode', { nextMode })
+    geolocationRequestIdRef.current += 1
+    setIsLocating(false)
     setErrorMessage(null)
-    setMode((currentMode) => {
-      const resolvedMode = currentMode === nextMode ? null : nextMode
-      console.log('[PointSelection] Step 2: selection mode updated', {
-        currentMode,
-        resolvedMode,
-      })
-      return resolvedMode
-    })
+    setMode((currentMode) => (currentMode === nextMode ? null : nextMode))
   }, [])
 
   const handleMapClick = useCallback((point: LngLat) => {
-    console.log('[PointSelection] Step 3: map click received', { mode, point })
+    geolocationRequestIdRef.current += 1
+    setIsLocating(false)
     setErrorMessage(null)
 
     if (mode === 'from') {
-      console.log('[PointSelection] Step 4: set from point from map click', { point })
       setFromPoint(point)
       setMode(null)
       return
     }
 
     if (mode === 'to') {
-      console.log('[PointSelection] Step 4: set to point from map click', { point })
       setToPoint(point)
       setMode(null)
       return
     }
-
-    console.log('[PointSelection] Step 4: ignore map click because no mode is active')
   }, [mode])
 
   const setFromGPS = useCallback(() => {
-    console.log('[PointSelection] Step 5: start geolocation request for from point')
+    const requestId = geolocationRequestIdRef.current + 1
+    geolocationRequestIdRef.current = requestId
+
+    setIsLocating(true)
     setErrorMessage(null)
     setMode('from')
 
     if (!navigator.geolocation) {
-      const nextError = 'This browser does not support geolocation.'
-      console.log('[PointSelection] Step 6: geolocation unavailable', { nextError })
-      setErrorMessage(nextError)
+      setIsLocating(false)
+      setErrorMessage('This browser does not support geolocation.')
+      console.error('[PointSelection] Geolocation is not supported by this browser.')
       return
     }
 
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        if (geolocationRequestIdRef.current !== requestId) return
+
         const point: LngLat = [coords.longitude, coords.latitude]
-        console.log('[PointSelection] Step 6: geolocation resolved', { point })
+
+        setIsLocating(false)
         setFromPoint(point)
+        setErrorMessage(null)
         setMode(null)
       },
       (error) => {
+        if (geolocationRequestIdRef.current !== requestId) return
+
         const nextError = `Could not get your location: ${error.message}`
-        console.log('[PointSelection] Step 6: geolocation failed', {
+
+        setIsLocating(false)
+        setErrorMessage(nextError)
+        console.error('[PointSelection] Geolocation request failed.', {
           code: error.code,
           message: error.message,
         })
-        setErrorMessage(nextError)
       },
       {
         enableHighAccuracy: true,
@@ -94,12 +99,12 @@ export const usePointSelection = (): UsePointSelectionResult => {
   }, [])
 
   const updateBufferRadius = useCallback((nextRadius: number) => {
-    console.log('[PointSelection] Step 7: update buffer radius', { nextRadius })
     setBufferRadius(nextRadius)
   }, [])
 
   const clear = useCallback(() => {
-    console.log('[PointSelection] Step 8: clear selection state')
+    geolocationRequestIdRef.current += 1
+    setIsLocating(false)
     setFromPoint(null)
     setToPoint(null)
     setMode(null)
@@ -111,6 +116,7 @@ export const usePointSelection = (): UsePointSelectionResult => {
     toPoint,
     mode,
     bufferRadius,
+    isLocating,
     errorMessage,
     activateMode,
     handleMapClick,
