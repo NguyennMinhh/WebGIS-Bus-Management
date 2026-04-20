@@ -73,7 +73,7 @@ DATABASES = {
         'NAME': env('POSTGRES_DB', default='busrouting'),
         'USER': env('POSTGRES_USER', default='postgres'),
         'PASSWORD': env('POSTGRES_PASSWORD', default='postgres'),
-        'HOST': env('POSTGRES_HOST', default='db'),
+        'HOST': env('POSTGRES_HOST', default='localhost'),
         'PORT': env('POSTGRES_PORT', default='5432'),
     }
 }
@@ -407,11 +407,14 @@ djangorestframework==3.16.0
 django-cors-headers==4.6.0
 django-environ==0.12.0
 psycopg2-binary==2.9.10
-GDAL==3.10.0          # Geospatial library cho GeoDjango
 ```
 
-**GDAL là gì?**
-- Geospatial Data Abstraction Library
-- Bắt buộc cho GeoDjango
-- Cần cài system library trước khi cài Python package
-- Dockerfile xử lý: `apt-get install gdal-bin libgdal-dev`
+**GDAL / GEOS trên Windows:**
+- Không cài qua pip. Dùng DLL có sẵn trong folder `bin\` của PostgreSQL (được cài kèm PostGIS)
+- Trỏ tới DLL qua `.env`:
+  ```
+  GDAL_LIBRARY_PATH=D:/MinhApp/PostgreSQL/18/bin/libgdal-35.dll
+  GEOS_LIBRARY_PATH=D:/MinhApp/PostgreSQL/18/bin/libgeos_c.dll
+  ```
+- Folder chứa DLL **phải có `libwinpthread-1.dll`** — nếu không, tất cả DLL MinGW sẽ load fail
+- `settings.py` dùng `os.add_dll_directory()` (Python 3.8+) để thêm folder này vào DLL search path trước khi Django load GeoDjango

@@ -1,9 +1,9 @@
 # DD-01 — Kiến Trúc Tổng Thể
 
 > **Loại tài liệu:** Design Document
-> **Phiên bản:** 1.0
-> **Cập nhật lần cuối:** 2026-03-18
-> **Trạng thái:** Draft
+> **Phiên bản:** 2.0
+> **Cập nhật lần cuối:** 2026-04-18
+> **Trạng thái:** Current
 
 ---
 
@@ -22,10 +22,12 @@
 | CORS | django-cors-headers | 4.6.0 | CORS middleware |
 | Database | PostgreSQL | 16 | Relational DB |
 | Spatial extension | PostGIS | 3.4 | Spatial queries |
-| Map tile server | GeoServer | 2.25.2 | WMS/WFS service |
-| Container | Docker + Docker Compose | 24+ | Orchestration |
-| Python | 3.12-slim | | Backend runtime |
-| Node | 20-Alpine | | Frontend runtime |
+| Map tile server | GeoServer | 2.25.2 | WMS/WFS service (chạy trong Docker) |
+| Container | Docker Desktop | 24+ | Chỉ dùng cho GeoServer |
+| Python | 3.12 (native Windows, venv) | | Backend runtime |
+| Node | 20+ (native Windows) | | Frontend runtime |
+
+**Mô hình chạy:** PostgreSQL, Django, React **chạy native trên Windows**. Chỉ **GeoServer chạy trong Docker**. Xem [DD-06](./DD-06_Infrastructure_Deployment.md).
 
 ---
 
@@ -182,16 +184,15 @@ Browser
 ### 4.2 Luồng import dữ liệu
 
 ```
-File tay-ho-datas.geojson
-  → [Docker volume mount] → /geojson/tay-ho-datas.geojson (trong container)
-  → python manage.py import_geojson
+File data/tay-ho-datas.geojson  (trực tiếp trên filesystem Windows)
+  → python manage.py import_geojson ../data/tay-ho-datas.geojson
        └─→ Parse JSON → tách route features & stop features
        └─→ Tạo/cập nhật BusRoute (GeoDjango ORM)
        └─→ Tạo/cập nhật BusStop (GeoDjango ORM)
        └─→ Tạo RouteStop links từ @relations
        └─→ SQL PostGIS: Tính sequence bằng ST_LineLocatePoint
-  → Dữ liệu lưu trong PostgreSQL/PostGIS
-  → GeoServer tự động phản chiếu dữ liệu mới
+  → Dữ liệu lưu trong PostgreSQL/PostGIS (native)
+  → GeoServer (Docker) tự động phản chiếu dữ liệu mới qua PostGIS Store
 ```
 
 ### 4.3 Luồng API (tương lai)
@@ -208,31 +209,25 @@ Browser
 
 ---
 
-## 5. Cấu Hình Mạng Docker
+## 5. Cấu Hình Mạng
 
-```yaml
-Network: gis-network (bridge)
+Tất cả service đều expose ra `localhost`, vì chỉ có 1 container Docker.
 
-Services:
-  db:        hostname "db",        port 5432 (exposed externally)
-  backend:   hostname "backend",   port 8000 (exposed externally)
-  geoserver: hostname "geoserver", port 8080 (mapped to 8600 externally)
-  frontend:  hostname "frontend",  port 5173 (exposed externally)
+| Service | Host | Port |
+|---------|------|------|
+| PostgreSQL (native) | `localhost` | 5432 |
+| Django Backend (native) | `localhost` | 8000 |
+| GeoServer (Docker) | `localhost` | 8600 (container port 8080) |
+| React Frontend (native, Vite) | `localhost` | 5173 |
+
+**Điểm tinh tế duy nhất — GeoServer → PostgreSQL:**
+GeoServer chạy trong container, `localhost` bên trong container trỏ vào chính container đó. Để gọi PostgreSQL trên host Windows, PostGIS Store của GeoServer phải dùng hostname đặc biệt của Docker Desktop:
+```
+Host: host.docker.internal
+Port: 5432
 ```
 
-**Tóm tắt port:**
-| Service | Port bên trong Docker | Port bên ngoài (host) |
-|---------|-----------------------|-----------------------|
-| PostgreSQL | 5432 | 5432 |
-| Django Backend | 8000 | 8000 |
-| GeoServer | 8080 | 8600 |
-| React Frontend | 5173 | 5173 |
-
-**Lưu ý về hostname:**
-- Trong Docker network, Backend dùng `db:5432` để kết nối DB
-- Trong Docker network, GeoServer dùng `db:5432` để kết nối DB
-- Từ browser (ngoài Docker), dùng `localhost:5432`, `localhost:8000`...
-- Frontend code chạy trong **browser**, nên dùng `localhost:8000` (không phải `backend:8000`)
+Các kết nối còn lại (Django↔Postgres, Frontend↔Django, Browser↔GeoServer) đều dùng `localhost` bình thường.
 
 ---
 
@@ -248,10 +243,10 @@ CORS_ALLOWED_ORIGINS = [
 ]
 ```
 
-**GeoServer CORS:** Được bật qua biến môi trường Docker trong `docker-compose.yml`:
+**GeoServer CORS:** Được bật qua biến môi trường trong `docker-compose.yml`:
 ```yaml
-GEOSERVER_CORS_ENABLED: "true"
-GEOSERVER_CORS_ALLOWED_ORIGINS: "*"
+CORS_ENABLED: "true"
+CORS_ALLOWED_ORIGINS: "http://localhost:5173"
 ```
 
 ---

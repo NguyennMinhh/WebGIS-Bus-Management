@@ -1,35 +1,56 @@
-// =============================================================================
-// Types / Interfaces cho WebGIS BusRouting
-// Thêm type vào đây khi code các tính năng mới
-// =============================================================================
-
-/** Tọa độ địa lý [lng, lat] — theo chuẩn GeoJSON */
 export type LngLat = [number, number]
 
-/** GeoJSON geometry cho lộ trình tuyến xe */
 export interface RouteGeometry {
   type: 'MultiLineString' | 'LineString'
   coordinates: LngLat[] | LngLat[][]
 }
 
-/** Một tuyến xe buýt */
 export interface BusRoute {
   id: number
-  ref: string           // Số tuyến: "09A", "50"
-  name: string          // Tên đầy đủ
+  ref: string
+  name: string | null
   from_stop: string
   to_stop: string
   operator: string
   opening_hours: string
-  charge: string        // Giá vé: "10000 VND"
-  interval: string      // Tần suất: "00:15-00:20"
+  charge: string | null
+  interval: string | null
   geometry: RouteGeometry
 }
 
-/** Một trạm dừng xe buýt */
 export interface BusStop {
   id: number
   name: string
   lat: number
   lng: number
+}
+
+export interface BusStopBasic {
+  id: number
+  name: string
+  lat: number
+  lng: number
+}
+
+export interface RouteStop extends BusStopBasic {
+  sequence: number
+}
+
+export interface RouteOption {
+  route: {
+    id: number
+    ref: string
+    name: string | null
+    charge: string | null
+    interval: string | null
+  }
+  from_stop: BusStopBasic
+  to_stop: BusStopBasic
+  stop_count: number
+  distance_m: number
+  stops: RouteStop[]
+  sub_route: {
+    type: 'LineString'
+    coordinates: LngLat[]
+  }
 }

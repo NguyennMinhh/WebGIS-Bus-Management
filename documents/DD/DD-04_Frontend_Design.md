@@ -385,13 +385,21 @@ Cung cấp styles cho:
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',  // Bind tất cả interfaces (cần thiết trong Docker)
+    host: 'localhost',
     port: 5173,
-  }
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
 })
 ```
 
-**`host: '0.0.0.0'`:** Bắt buộc khi chạy trong Docker — nếu bind `localhost` thì không thể access từ bên ngoài container.
+**`host: 'localhost'`:** Frontend chạy native trên Windows (không Docker), nên bind localhost là đủ.
+
+**`proxy`:** Chuyển tiếp mọi request `/api/*` từ Vite dev server sang Django ở cổng 8000 → tránh vấn đề CORS khi dev.
 
 ### 5.2 npm Scripts
 
