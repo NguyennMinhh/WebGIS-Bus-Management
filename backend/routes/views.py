@@ -2,16 +2,25 @@ import json
 import logging
 
 from django.contrib.gis.geos import Point
+from django.db import transaction
 from django.db import connection
+from django.db.models import Max
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework import filters, viewsets
+from rest_framework.decorators import action, api_view
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 
 from .models import BusRoute, BusStop, RouteStop
 from .serializers import (
+    BusRouteDetailSerializer,
     BusRouteInfoSerializer,
+    BusRouteWriteSerializer,
     BusStopSerializer,
+    BusStopWriteSerializer,
     RouteOptionSerializer,
+    RouteStopAssignmentSerializer,
+    RouteStopWithSequenceSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,6 +50,90 @@ def _find_nearby_stop_ids(point, buffer_m):
             [point.x, point.y, buffer_m],
         )
         return [row[0] for row in cur.fetchall()]
+
+
+def _serialize_route_stops(route_id):
+    route_stops = (
+        RouteStop.objects.filter(route_id=route_id)
+        .select_related('stop')
+        .order_by('sequence', 'id')
+    )
+    return RouteStopWithSequenceSerializer(route_stops, many=True).data
+
+
+def _compact_route_stop_sequences(route_id):
+    route_stops = list(
+        RouteStop.objects.filter(route_id=route_id)
+        .order_by('sequence', 'id')
+    )
+    changed_route_stops = []
+
+    for index, route_stop in enumerate(route_stops, start=1):
+        if route_stop.sequence == index:
+            continue
+
+        route_stop.sequence = index
+        changed_route_stops.append(route_stop)
+
+    if changed_route_stops:
+        RouteStop.objects.bulk_update(changed_route_stops, ['sequence'])
+
+
+class BusStopViewSet(viewsets.ModelViewSet):
+    queryset = BusStop.objects.all().order_by('name')
+    serializer_class = BusStopWriteSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'osm_id']
+
+
+class BusRouteViewSet(viewsets.ModelViewSet):
+    queryset = BusRoute.objects.all().prefetch_related('route_stops__stop').order_by('ref')
+    serializer_class = BusRouteWriteSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['ref', 'name']
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return BusRouteDetailSerializer
+
+        return BusRouteWriteSerializer
+
+    @action(detail=True, methods=['post'], url_path='add-stop')
+    def add_stop(self, request, pk=None):
+        route = self.get_object()
+        serializer = RouteStopAssignmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        stop = serializer.validated_data['stop']
+
+        if RouteStop.objects.filter(route=route, stop=stop).exists():
+            raise ValidationError({'stop_id': ['This stop is already assigned to the route.']})
+
+        next_sequence = (
+            RouteStop.objects.filter(route=route).aggregate(max_sequence=Max('sequence'))['max_sequence']
+            or 0
+        ) + 1
+
+        RouteStop.objects.create(route=route, stop=stop, sequence=next_sequence)
+
+        return Response({'stops': _serialize_route_stops(route.id)}, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=['delete'],
+        url_path=r'remove-stop/(?P<stop_id>[^/.]+)',
+    )
+    def remove_stop(self, request, pk=None, stop_id=None):
+        route = self.get_object()
+
+        with transaction.atomic():
+            deleted_count, _ = RouteStop.objects.filter(route=route, stop_id=stop_id).delete()
+
+            if deleted_count == 0:
+                raise NotFound('This stop is not assigned to the route.')
+
+            _compact_route_stop_sequences(route.id)
+
+        return Response({'stops': _serialize_route_stops(route.id)})
 
 
 @api_view(['GET'])

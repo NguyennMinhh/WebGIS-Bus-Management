@@ -7,19 +7,27 @@ export interface RouteGeometry {
 
 export interface BusRoute {
   id: number
+  osm_id: string
   ref: string
-  name: string | null
+  name: string
   from_stop: string
   to_stop: string
   operator: string
   opening_hours: string
-  charge: string | null
-  interval: string | null
-  geometry: RouteGeometry
+  charge: string
+  interval: string
 }
 
 export interface BusStop {
   id: number
+  osm_id: string
+  name: string
+  lat: number
+  lng: number
+}
+
+export interface BusStopInput {
+  osm_id: string
   name: string
   lat: number
   lng: number
@@ -34,6 +42,22 @@ export interface BusStopBasic {
 
 export interface RouteStop extends BusStopBasic {
   sequence: number
+}
+
+export interface BusRouteInput {
+  osm_id: string
+  ref: string
+  name: string
+  from_stop: string
+  to_stop: string
+  operator: string
+  opening_hours: string
+  charge: string
+  interval: string
+}
+
+export interface BusRouteDetail extends BusRoute {
+  stops: RouteStop[]
 }
 
 export interface RouteOption {

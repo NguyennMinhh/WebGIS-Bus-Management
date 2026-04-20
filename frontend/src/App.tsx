@@ -111,7 +111,7 @@ const App = () => {
         <MapView containerRef={containerRef} mode={selection.mode} />
       </div>
 
-      <Header />
+      <Header variant="overlay" />
       <SelectionControls
         mode={selection.mode}
         fromPoint={selection.fromPoint}
