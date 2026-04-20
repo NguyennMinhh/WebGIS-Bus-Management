@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FocusEvent, KeyboardEvent } from 'react'
 
-import type { SelectionMode } from '../../hooks/usePointSelection'
 import { usePlaceSearch } from '../../hooks/usePlaceSearch'
 import type { PlaceDetail, PlaceSuggestion } from '../../types'
-import { PlaceTargetPicker } from './PlaceTargetPicker'
-
-type PlaceTarget = Exclude<SelectionMode, null>
 
 interface PlaceSearchBoxProps {
-  onPick: (target: PlaceTarget, place: PlaceDetail) => void
+  onSelectPlace: (place: PlaceDetail) => void
 }
 
 const MIN_QUERY_LENGTH = 2
@@ -17,7 +13,7 @@ const MIN_QUERY_LENGTH = 2
 const formatSuggestionLabel = (suggestion: PlaceSuggestion) =>
   suggestion.main_text || suggestion.description
 
-export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
+export const PlaceSearchBox = ({ onSelectPlace }: PlaceSearchBoxProps) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const {
     query,
@@ -31,13 +27,10 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
   } = usePlaceSearch()
   const [isFocused, setIsFocused] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
-  const [pendingPlace, setPendingPlace] = useState<PlaceDetail | null>(null)
-  const [pendingPlaceLabel, setPendingPlaceLabel] = useState('')
   const hasMinQueryLength = query.trim().length >= MIN_QUERY_LENGTH
   const showEmptyState = status === 'success' && suggestions.length === 0
   const showDropdown =
     isFocused &&
-    !pendingPlace &&
     !isResolving &&
     hasMinQueryLength &&
     (status === 'loading' || suggestions.length > 0 || Boolean(error) || showEmptyState)
@@ -57,9 +50,7 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
     })
   }, [showDropdown, suggestions.length])
 
-  const closeTransientPanels = () => {
-    setPendingPlace(null)
-    setPendingPlaceLabel('')
+  const resetTransientState = () => {
     setHighlightedIndex(-1)
   }
 
@@ -71,7 +62,7 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
     }
 
     setIsFocused(false)
-    closeTransientPanels()
+    resetTransientState()
   }
 
   const handleSuggestionSelect = async (suggestion: PlaceSuggestion) => {
@@ -81,13 +72,20 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
       return
     }
 
-    setPendingPlace(resolvedPlace)
-    setPendingPlaceLabel(resolvedPlace.name || formatSuggestionLabel(suggestion))
-    setHighlightedIndex(-1)
+    console.info('[PlaceSearchBox] Place selected.', {
+      name: resolvedPlace.name || formatSuggestionLabel(suggestion),
+      point: [resolvedPlace.lng, resolvedPlace.lat],
+    })
+
+    onSelectPlace(resolvedPlace)
+    clear()
+    resetTransientState()
+    setIsFocused(false)
+    inputRef.current?.blur()
   }
 
   const handleInputChange = (nextQuery: string) => {
-    closeTransientPanels()
+    resetTransientState()
     setIsFocused(true)
     setQuery(nextQuery)
   }
@@ -96,12 +94,12 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
     if (event.key === 'Escape') {
       event.preventDefault()
       setIsFocused(false)
-      closeTransientPanels()
+      resetTransientState()
       inputRef.current?.blur()
       return
     }
 
-    if (pendingPlace || !showDropdown || suggestions.length === 0) {
+    if (!showDropdown || suggestions.length === 0) {
       return
     }
 
@@ -130,18 +128,6 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
       event.preventDefault()
       await handleSuggestionSelect(suggestions[highlightedIndex])
     }
-  }
-
-  const handleTargetPick = (target: PlaceTarget) => {
-    if (!pendingPlace) {
-      return
-    }
-
-    onPick(target, pendingPlace)
-    clear()
-    closeTransientPanels()
-    setIsFocused(false)
-    inputRef.current?.blur()
   }
 
   return (
@@ -221,13 +207,6 @@ export const PlaceSearchBox = ({ onPick }: PlaceSearchBoxProps) => {
             </ul>
           ) : null}
         </div>
-      ) : null}
-
-      {pendingPlace ? (
-        <PlaceTargetPicker
-          placeName={pendingPlaceLabel}
-          onPick={handleTargetPick}
-        />
       ) : null}
     </div>
   )

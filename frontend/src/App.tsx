@@ -29,7 +29,6 @@ const App = () => {
     containerRef,
     selection.handleMapClick,
   )
-  const [pendingFlyToPlace, setPendingFlyToPlace] = useState<PlaceDetail | null>(null)
 
   const { results, status, error, emptyMessage, search } = useRouteSearch(
     selection.fromPoint,
@@ -43,20 +42,11 @@ const App = () => {
       to: selection.toPoint,
       bufferRadius: selection.bufferRadius,
     })
-
-    if (!pendingFlyToPlace) {
-      return
-    }
-
-    flyTo(pendingFlyToPlace.lng, pendingFlyToPlace.lat, 16)
-    setPendingFlyToPlace(null)
   }, [
     selection.fromPoint,
     selection.toPoint,
     selection.bufferRadius,
     drawSelectionMarkers,
-    flyTo,
-    pendingFlyToPlace,
   ])
 
   useEffect(() => {
@@ -118,20 +108,13 @@ const App = () => {
     })
   }
 
-  const handlePlacePick = (target: 'from' | 'to', place: PlaceDetail) => {
+  const handlePlaceSelect = (place: PlaceDetail) => {
     console.info(`${APP_LOG_PREFIX} Place selected from search.`, {
-      target,
       name: place.name,
       point: [place.lng, place.lat],
     })
 
-    if (target === 'from') {
-      selection.setFromPlace([place.lng, place.lat])
-    } else {
-      selection.setToPlace([place.lng, place.lat])
-    }
-
-    setPendingFlyToPlace(place)
+    flyTo(place.lng, place.lat, 16)
   }
 
   return (
@@ -142,7 +125,7 @@ const App = () => {
 
       <Header
         variant="overlay"
-        centerContent={<PlaceSearchBox onPick={handlePlacePick} />}
+        centerContent={<PlaceSearchBox onSelectPlace={handlePlaceSelect} />}
       />
       <SelectionControls
         mode={selection.mode}

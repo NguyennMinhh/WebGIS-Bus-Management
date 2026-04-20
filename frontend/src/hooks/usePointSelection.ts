@@ -14,8 +14,6 @@ interface UsePointSelectionResult {
   activateMode: (nextMode: SelectionMode) => void
   handleMapClick: (point: LngLat) => void
   setFromGPS: () => void
-  setFromPlace: (point: LngLat) => void
-  setToPlace: (point: LngLat) => void
   updateBufferRadius: (nextRadius: number) => void
   clear: () => void
 }
@@ -112,14 +110,6 @@ export const usePointSelection = (): UsePointSelectionResult => {
     setBufferRadius(nextRadius)
   }, [])
 
-  const setFromPlace = useCallback((point: LngLat) => {
-    applySelectedPoint('from', point)
-  }, [applySelectedPoint])
-
-  const setToPlace = useCallback((point: LngLat) => {
-    applySelectedPoint('to', point)
-  }, [applySelectedPoint])
-
   const clear = useCallback(() => {
     geolocationRequestIdRef.current += 1
     setIsLocating(false)
@@ -139,8 +129,6 @@ export const usePointSelection = (): UsePointSelectionResult => {
     activateMode,
     handleMapClick,
     setFromGPS,
-    setFromPlace,
-    setToPlace,
     updateBufferRadius,
     clear,
   }
