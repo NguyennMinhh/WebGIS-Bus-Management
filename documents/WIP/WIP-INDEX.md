@@ -15,7 +15,7 @@ Route Finder là tính năng cốt lõi của hệ thống, cho phép người d
 | File | Tính năng | Trạng thái | Phụ thuộc |
 |------|-----------|-----------|-----------|
 | [WIP-F01-Chon-Diem-Di-Den.md](./WIP-F01-Chon-Diem-Di-Den.md) | Chọn điểm đi/đến + buffer trên bản đồ | 🔄 Đang code | — |
-| [WIP-F02-Tim-Tuyen-Dang-1.md](./WIP-F02-Tim-Tuyen-Dang-1.md) | Tìm tuyến dạng 1: 1 tuyến thẳng | 🔄 Đang code | F01 |
+| [WIP-F02-Route-Results-Panel.md](./WIP-F02-Route-Results-Panel.md) | Tìm tuyến dạng 1 + hiển thị kết quả (right panel, multi-colour) | 🔄 Đang code | F01 |
 | WIP-F03-Tim-Tuyen-Dang-2.md | Tìm tuyến dạng 2: *(chưa thiết kế)* | ⏳ Chưa bắt đầu | F02 |
 | WIP-F04-Tim-Tuyen-Dang-3.md | Tìm tuyến dạng 3: *(chưa thiết kế)* | ⏳ Chưa bắt đầu | F03 |
 

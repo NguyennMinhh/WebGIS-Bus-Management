@@ -8,11 +8,10 @@ import View from 'ol/View'
 import CircleGeometry from 'ol/geom/Circle'
 import Point from 'ol/geom/Point'
 import { fromCircle } from 'ol/geom/Polygon'
-import ImageLayer from 'ol/layer/Image'
 import TileLayer from 'ol/layer/Tile'
 import VectorLayer from 'ol/layer/Vector'
 import OSM from 'ol/source/OSM'
-import ImageWMS from 'ol/source/ImageWMS'
+import TileWMS from 'ol/source/TileWMS'
 import VectorSource from 'ol/source/Vector'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import CircleStyle from 'ol/style/Circle'
@@ -27,6 +26,8 @@ import {
   GEOSERVER_WMS_URL,
   LAYER_BUS_ROUTES,
   LAYER_BUS_STOPS,
+  BUS_ROUTES_SLD_BODY,
+  BUS_STOPS_SLD_BODY,
 } from '../utils/mapConfig'
 import type { LngLat } from '../types'
 
@@ -77,30 +78,32 @@ export const useMap = (
       properties: { name: 'osm-base' },
     })
 
-    const busRoutesLayer = new ImageLayer({
-      source: new ImageWMS({
+    const busRoutesLayer = new TileLayer({
+      source: new TileWMS({
         url: GEOSERVER_WMS_URL,
         params: {
           LAYERS: LAYER_BUS_ROUTES,
           FORMAT: 'image/png',
           TRANSPARENT: true,
+          TILED: true,
+          SLD_BODY: BUS_ROUTES_SLD_BODY,
         },
-        ratio: 1,
         serverType: 'geoserver',
       }),
       opacity: 0.8,
       properties: { name: 'bus-routes' },
     })
 
-    const busStopsLayer = new ImageLayer({
-      source: new ImageWMS({
+    const busStopsLayer = new TileLayer({
+      source: new TileWMS({
         url: GEOSERVER_WMS_URL,
         params: {
           LAYERS: LAYER_BUS_STOPS,
           FORMAT: 'image/png',
           TRANSPARENT: true,
+          TILED: true,
+          SLD_BODY: BUS_STOPS_SLD_BODY,
         },
-        ratio: 1,
         serverType: 'geoserver',
       }),
       properties: { name: 'bus-stops' },
