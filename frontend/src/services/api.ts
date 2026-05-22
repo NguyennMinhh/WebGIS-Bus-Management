@@ -3,6 +3,8 @@ import type { PlaceDetail, PlaceSuggestion, RouteOption } from '../types'
 const RAW_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || '/api'
 const BASE_URL = RAW_BASE_URL.replace(/\/$/, '')
 const API_LOG_PREFIX = '[API]'
+const CSRF_COOKIE_NAME = 'csrftoken'
+const CSRF_HEADER_NAME = 'X-CSRFToken'
 
 console.info(`${API_LOG_PREFIX} Base URL configured.`, {
   configured: RAW_BASE_URL,
@@ -77,6 +79,17 @@ const parseResponseBody = async (response: Response) => {
   return text.length > 0 ? text : null
 }
 
+const getCookie = (name: string) => {
+  const cookie = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`))
+
+  return cookie ? decodeURIComponent(cookie.split('=').slice(1).join('=')) : null
+}
+
+const isUnsafeMethod = (method: string) =>
+  !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method.toUpperCase())
+
 export class ApiError extends Error {
   status: number
   payload: unknown
@@ -92,12 +105,20 @@ export class ApiError extends Error {
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`
   const method = init?.method ?? 'GET'
+  const headers = new Headers(init?.headers)
+  const csrfToken = getCookie(CSRF_COOKIE_NAME)
+
+  if (csrfToken && isUnsafeMethod(method) && !headers.has(CSRF_HEADER_NAME)) {
+    headers.set(CSRF_HEADER_NAME, csrfToken)
+  }
 
   console.info(`${API_LOG_PREFIX} Request start`, { method, url })
 
   const response = await fetch(url, {
-    method,
     ...init,
+    method,
+    credentials: init?.credentials ?? 'same-origin',
+    headers,
   })
   const payload = await parseResponseBody(response)
 

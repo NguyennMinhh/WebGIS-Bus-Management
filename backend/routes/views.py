@@ -12,6 +12,7 @@ from rest_framework import status
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
 from .models import BusRoute, BusStop, RouteStop
@@ -141,6 +142,7 @@ class BusStopViewSet(viewsets.ModelViewSet):
     serializer_class = BusStopWriteSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'osm_id']
+    permission_classes = [IsAdminUser]
 
 
 class BusRouteViewSet(viewsets.ModelViewSet):
@@ -148,6 +150,7 @@ class BusRouteViewSet(viewsets.ModelViewSet):
     serializer_class = BusRouteWriteSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['ref', 'name']
+    permission_classes = [IsAdminUser]
 
     def get_serializer_class(self):
         if self.action == 'retrieve':

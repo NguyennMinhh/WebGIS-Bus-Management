@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 
+import { useAuth } from '../../hooks/useAuth'
+
 interface HeaderProps {
   variant?: 'page' | 'overlay'
   centerContent?: ReactNode
 }
 
 const Header = ({ variant = 'page', centerContent = null }: HeaderProps) => {
+  const { user, logout } = useAuth()
   const isOverlay = variant === 'overlay'
   const wrapperClassName = isOverlay
     ? 'absolute inset-x-0 top-0 z-10'
@@ -18,6 +21,10 @@ const Header = ({ variant = 'page', centerContent = null }: HeaderProps) => {
         ? 'bg-slate-900 text-white'
         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
     }`
+
+  const handleLogout = () => {
+    logout().catch(() => undefined)
+  }
 
   return (
     <header className={wrapperClassName}>
@@ -46,9 +53,34 @@ const Header = ({ variant = 'page', centerContent = null }: HeaderProps) => {
           <NavLink to="/" end className={navLinkClassName}>
             Map
           </NavLink>
-          <NavLink to="/manage" className={navLinkClassName}>
-            Manage
-          </NavLink>
+          {user?.is_staff ? (
+            <NavLink to="/manage" className={navLinkClassName}>
+              Manage
+            </NavLink>
+          ) : null}
+          {user?.is_authenticated ? (
+            <>
+              <span className="hidden text-sm font-medium text-slate-600 sm:inline">
+                {user.username}
+              </span>
+              <button
+                className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                type="button"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/login" className={navLinkClassName}>
+                Login
+              </NavLink>
+              <NavLink to="/register" className={navLinkClassName}>
+                Register
+              </NavLink>
+            </>
+          )}
         </nav>
       </div>
     </header>

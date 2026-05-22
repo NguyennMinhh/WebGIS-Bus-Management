@@ -1,5 +1,21 @@
 export type LngLat = [number, number]
 
+export interface AuthUser {
+  is_authenticated: boolean
+  username: string
+  email: string
+  is_staff: boolean
+}
+
+export interface LoginInput {
+  username: string
+  password: string
+}
+
+export interface RegisterInput extends LoginInput {
+  email?: string
+}
+
 export interface RouteGeometry {
   type: 'MultiLineString' | 'LineString'
   coordinates: LngLat[] | LngLat[][]
