@@ -1,33 +1,36 @@
 # Tài Liệu Dự Án WebGIS-BusRouting
 
-Thư mục này chứa toàn bộ tài liệu kỹ thuật của dự án. Được tổ chức thành 2 loại:
+Thư mục này chứa tài liệu mô tả hệ thống WebGIS tra cứu tuyến xe buýt. Tài liệu được chia theo **feature**, không chia theo frontend/backend, để dễ dùng khi viết báo cáo đồ án.
 
-## FD — Functional Documents (Tài liệu chức năng)
+## Cách Chia Tài Liệu
 
-Mô tả **WHAT** — hệ thống làm gì, nghiệp vụ là gì.
+- `FD/`: Functional Design, mô tả chức năng theo góc nhìn người dùng và nội dung có thể đưa vào báo cáo.
+- `DD/`: Design Document, mô tả cách hệ thống xử lý kỹ thuật cho từng chức năng.
 
-| File | Nội dung |
-|------|---------|
-| [FD-01 — Tổng Quan Dự Án](./FD/FD-01_Tong_Quan_Du_An.md) | Mục tiêu, phạm vi, đối tượng người dùng, dữ liệu nguồn |
-| [FD-02 — Chức Năng Hệ Thống](./FD/FD-02_Chuc_Nang_He_Thong.md) | Danh sách tính năng, mô tả chi tiết, trạng thái |
-| [FD-03 — Quy Trình Nghiệp Vụ](./FD/FD-03_Quy_Trinh_Nghiep_Vu.md) | Import dữ liệu, cài đặt môi trường, xử lý sự cố |
+Mỗi feature có một file FD và một file DD cùng mã. Ví dụ:
 
-## DD — Design Documents (Tài liệu thiết kế kỹ thuật)
+- `FD/FD-F04_Tim_Tuyen_Xe_Buyt.md`: chức năng tìm tuyến xe buýt dùng để viết báo cáo.
+- `DD/DD-F04_Tim_Tuyen_Xe_Buyt.md`: thiết kế xử lý, API, truy vấn và dữ liệu liên quan.
 
-Mô tả **HOW** — hệ thống hoạt động như thế nào, được xây dựng ra sao.
+## Danh Sách Feature
 
-| File | Nội dung |
-|------|---------|
-| [DD-01 — Kiến Trúc Tổng Thể](./DD/DD-01_Kien_Truc_Tong_The.md) | Stack công nghệ, sơ đồ kiến trúc, luồng dữ liệu |
-| [DD-02 — Database Design](./DD/DD-02_Database_Design.md) | Schema, ERD, PostGIS queries quan trọng |
-| [DD-03 — Backend Design](./DD/DD-03_Backend_Design.md) | Django models, import pipeline, API design |
-| [DD-04 — Frontend Design](./DD/DD-04_Frontend_Design.md) | React components, OpenLayers, hooks |
-| [DD-05 — GIS & Spatial Design](./DD/DD-05_GIS_Spatial_Design.md) | PostGIS functions, coordinate systems, GeoServer |
-| [DD-06 — Infrastructure](./DD/DD-06_Infrastructure_Deployment.md) | Docker Compose, services, deployment |
-| [DD-07 — Developer Guide](./DD/DD-07_Developer_Guide.md) | ⭐ **Đọc cái này trước** nếu bạn mới join |
+| Mã | Feature | FD | DD |
+| --- | --- | --- | --- |
+| F01 | Thu thập, import và tổ chức dữ liệu xe buýt | `FD-F01_Du_Lieu_Xe_Buyt.md` | `DD-F01_Du_Lieu_Xe_Buyt.md` |
+| F02 | Hiển thị bản đồ và lớp WMS | `FD-F02_Ban_Do_WMS.md` | `DD-F02_Ban_Do_WMS.md` |
+| F03 | Chọn điểm đi, điểm đến và tạo buffer | `FD-F03_Chon_Diem_Buffer.md` | `DD-F03_Chon_Diem_Buffer.md` |
+| F04 | Tìm tuyến xe buýt có thể đi | `FD-F04_Tim_Tuyen_Xe_Buyt.md` | `DD-F04_Tim_Tuyen_Xe_Buyt.md` |
+| F05 | Hiển thị hành trình đi bộ và đi xe buýt | `FD-F05_Hien_Thi_Hanh_Trinh.md` | `DD-F05_Hien_Thi_Hanh_Trinh.md` |
+| F06 | Tìm kiếm địa điểm bằng Goong API | `FD-F06_Tim_Kiem_Goong.md` | `DD-F06_Tim_Kiem_Goong.md` |
+| F07 | Đăng ký, đăng nhập, đăng xuất và phân quyền | `FD-F07_Tai_Khoan_Phan_Quyen.md` | `DD-F07_Tai_Khoan_Phan_Quyen.md` |
+| F08 | Quản lý trạm xe và tuyến xe dành cho admin | `FD-F08_Quan_Ly_Du_Lieu_Admin.md` | `DD-F08_Quan_Ly_Du_Lieu_Admin.md` |
+| F09 | Kết quả đạt được và hướng phát triển | `FD-F09_Ket_Luan_Huong_Phat_Trien.md` | `DD-F09_Chay_Project.md` |
 
-## Thứ tự đọc cho người mới
+## Thứ Tự Đọc Nên Dùng
 
-```
-FD-01 → FD-02 → DD-01 → DD-07 (setup) → DD-02 → DD-03 → DD-04 → DD-05
-```
+Nếu cần viết báo cáo, đọc các file `FD` trước theo thứ tự F01 đến F09. Khi cần giải thích code, ảnh code hoặc luồng kỹ thuật thì đọc file `DD` tương ứng.
+
+## Ghi Chú
+
+- Tài liệu này chỉ mô tả hệ thống, không thay đổi logic source code.
+- Các file cũ kiểu `Backend_Design`, `Frontend_Design`, `GIS_Spatial_Design` đã được thay bằng tài liệu theo feature để tránh trùng lặp và dễ đọc hơn.

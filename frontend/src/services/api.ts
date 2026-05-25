@@ -117,7 +117,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const response = await fetch(url, {
     ...init,
     method,
-    credentials: init?.credentials ?? 'same-origin',
+    credentials: init?.credentials ?? 'include',
     headers,
   })
   const payload = await parseResponseBody(response)
