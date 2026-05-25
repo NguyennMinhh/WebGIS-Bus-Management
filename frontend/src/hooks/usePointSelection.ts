@@ -27,20 +27,6 @@ export const usePointSelection = (): UsePointSelectionResult => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const geolocationRequestIdRef = useRef(0)
 
-  const applySelectedPoint = useCallback((target: Exclude<SelectionMode, null>, point: LngLat) => {
-    geolocationRequestIdRef.current += 1
-    setIsLocating(false)
-    setErrorMessage(null)
-    setMode(null)
-
-    if (target === 'from') {
-      setFromPoint(point)
-      return
-    }
-
-    setToPoint(point)
-  }, [])
-
   const activateMode = useCallback((nextMode: SelectionMode) => {
     geolocationRequestIdRef.current += 1
     setIsLocating(false)
@@ -49,16 +35,20 @@ export const usePointSelection = (): UsePointSelectionResult => {
   }, [])
 
   const handleMapClick = useCallback((point: LngLat) => {
+    if (!mode) return
+
+    geolocationRequestIdRef.current += 1
+
     if (mode === 'from') {
-      applySelectedPoint('from', point)
-      return
+      setFromPoint(point)
+    } else {
+      setToPoint(point)
     }
 
-    if (mode === 'to') {
-      applySelectedPoint('to', point)
-      return
-    }
-  }, [applySelectedPoint, mode])
+    setIsLocating(false)
+    setErrorMessage(null)
+    setMode(null)
+  }, [mode])
 
   const setFromGPS = useCallback(() => {
     const requestId = geolocationRequestIdRef.current + 1

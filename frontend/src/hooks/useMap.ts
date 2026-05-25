@@ -204,6 +204,7 @@ export const useMap = (
   const drawSelectionMarkers = useCallback(
     ({ from, to, bufferRadius }: DrawSelectionMarkersParams) => {
       const source = selectionSourceRef.current
+      // xoá các marker, buffer cũ trước khi vẽ lại
       source.clear()
 
       console.info(`${ROUTE_MAP_LOG_PREFIX} Redrawing selection markers.`, {
