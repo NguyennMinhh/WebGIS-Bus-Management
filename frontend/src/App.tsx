@@ -3,10 +3,13 @@ import { useEffect, useRef, useState } from 'react'
 import Header from './components/layout/Header'
 import MapView from './components/map/MapView'
 import { SelectionControls } from './components/map/SelectionControls'
+import { PlaceSearchBox } from './components/search/PlaceSearchBox'
 import { RouteResultPanel } from './components/search/RouteResultPanel'
 import { useMap } from './hooks/useMap'
 import { usePointSelection } from './hooks/usePointSelection'
 import { useRouteSearch } from './hooks/useRouteSearch'
+import { useWalkingRoutes } from './hooks/useWalkingRoutes'
+import type { PlaceDetail } from './types'
 
 const APP_LOG_PREFIX = '[App]'
 
@@ -22,6 +25,7 @@ const App = () => {
     drawRouteResults,
     clearRouteResults,
     setOverlayLayerVisibility,
+    flyTo,
   } = useMap(
     containerRef,
     selection.handleMapClick,
@@ -31,6 +35,17 @@ const App = () => {
     selection.fromPoint,
     selection.toPoint,
     selection.bufferRadius,
+  )
+  const selectedRoute =
+    selectedRouteIndex !== null &&
+    selectedRouteIndex >= 0 &&
+    selectedRouteIndex < results.length
+      ? results[selectedRouteIndex]
+      : null
+  const walkingRoutes = useWalkingRoutes(
+    selection.fromPoint,
+    selection.toPoint,
+    selectedRoute,
   )
 
   useEffect(() => {
@@ -47,8 +62,12 @@ const App = () => {
   ])
 
   useEffect(() => {
-    drawRouteResults(results, selectedRouteIndex)
-  }, [results, selectedRouteIndex, drawRouteResults])
+    drawRouteResults({
+      results,
+      selectedIndex: selectedRouteIndex,
+      walkingRoutes,
+    })
+  }, [results, selectedRouteIndex, walkingRoutes, drawRouteResults])
 
   useEffect(() => {
     setOverlayLayerVisibility('bus-routes', showBusRoutes)
@@ -105,13 +124,25 @@ const App = () => {
     })
   }
 
+  const handlePlaceSelect = (place: PlaceDetail) => {
+    console.info(`${APP_LOG_PREFIX} Place selected from search.`, {
+      name: place.name,
+      point: [place.lng, place.lat],
+    })
+
+    flyTo(place.lng, place.lat, 16)
+  }
+
   return (
     <div className="relative h-full w-full">
       <div className="absolute inset-0">
         <MapView containerRef={containerRef} mode={selection.mode} />
       </div>
 
-      <Header />
+      <Header
+        variant="overlay"
+        centerContent={<PlaceSearchBox onSelectPlace={handlePlaceSelect} />}
+      />
       <SelectionControls
         mode={selection.mode}
         fromPoint={selection.fromPoint}

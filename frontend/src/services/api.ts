@@ -1,8 +1,10 @@
-import type { RouteOption } from '../types'
+import type { PlaceDetail, PlaceSuggestion, RouteOption } from '../types'
 
 const RAW_BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.trim() || '/api'
 const BASE_URL = RAW_BASE_URL.replace(/\/$/, '')
 const API_LOG_PREFIX = '[API]'
+const CSRF_COOKIE_NAME = 'csrftoken'
+const CSRF_HEADER_NAME = 'X-CSRFToken'
 
 console.info(`${API_LOG_PREFIX} Base URL configured.`, {
   configured: RAW_BASE_URL,
@@ -12,12 +14,46 @@ console.info(`${API_LOG_PREFIX} Base URL configured.`, {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
+const extractFieldError = (value: unknown): string | null => {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const message = extractFieldError(item)
+
+      if (message) {
+        return message
+      }
+    }
+  }
+
+  if (isRecord(value)) {
+    for (const nestedValue of Object.values(value)) {
+      const message = extractFieldError(nestedValue)
+
+      if (message) {
+        return message
+      }
+    }
+  }
+
+  return null
+}
+
 const extractErrorMessage = (payload: unknown, status: number, path: string) => {
   if (isRecord(payload)) {
     const message = payload.error ?? payload.detail ?? payload.message
 
     if (typeof message === 'string' && message.trim().length > 0) {
       return message
+    }
+
+    const fieldMessage = extractFieldError(payload)
+
+    if (fieldMessage) {
+      return fieldMessage
     }
   }
 
@@ -43,6 +79,17 @@ const parseResponseBody = async (response: Response) => {
   return text.length > 0 ? text : null
 }
 
+const getCookie = (name: string) => {
+  const cookie = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`))
+
+  return cookie ? decodeURIComponent(cookie.split('=').slice(1).join('=')) : null
+}
+
+const isUnsafeMethod = (method: string) =>
+  !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(method.toUpperCase())
+
 export class ApiError extends Error {
   status: number
   payload: unknown
@@ -55,22 +102,32 @@ export class ApiError extends Error {
   }
 }
 
-async function get<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`
+  const method = init?.method ?? 'GET'
+  const headers = new Headers(init?.headers)
+  const csrfToken = getCookie(CSRF_COOKIE_NAME)
 
-  console.info(`${API_LOG_PREFIX} GET start`, { url })
+  if (csrfToken && isUnsafeMethod(method) && !headers.has(CSRF_HEADER_NAME)) {
+    headers.set(CSRF_HEADER_NAME, csrfToken)
+  }
+
+  console.info(`${API_LOG_PREFIX} Request start`, { method, url })
 
   const response = await fetch(url, {
-    method: 'GET',
     ...init,
+    method,
+    credentials: init?.credentials ?? 'same-origin',
+    headers,
   })
   const payload = await parseResponseBody(response)
 
   if (!response.ok) {
     const message = extractErrorMessage(payload, response.status, path)
 
-    console.error(`${API_LOG_PREFIX} GET failed`, {
+    console.error(`${API_LOG_PREFIX} Request failed`, {
       url,
+      method,
       status: response.status,
       payload,
     })
@@ -78,12 +135,20 @@ async function get<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(message, response.status, payload)
   }
 
-  console.info(`${API_LOG_PREFIX} GET success`, {
+  console.info(`${API_LOG_PREFIX} Request success`, {
     url,
+    method,
     status: response.status,
   })
 
   return payload as T
+}
+
+async function get<T>(path: string, init?: RequestInit): Promise<T> {
+  return apiRequest<T>(path, {
+    method: 'GET',
+    ...init,
+  })
 }
 
 interface FindRouteParams {
@@ -109,7 +174,32 @@ export const findRoute = (
   return get<RouteOption[]>(`/find-route/?${queryString.toString()}`, { signal })
 }
 
+export const placeAutocomplete = (
+  input: string,
+  signal?: AbortSignal,
+): Promise<PlaceSuggestion[]> => {
+  const queryString = new URLSearchParams({
+    input,
+  })
+
+  return get<PlaceSuggestion[]>(`/places/autocomplete/?${queryString.toString()}`, { signal })
+}
+
+export const placeDetail = (
+  placeId: string,
+  signal?: AbortSignal,
+): Promise<PlaceDetail> => {
+  const queryString = new URLSearchParams({
+    place_id: placeId,
+  })
+
+  return get<PlaceDetail>(`/places/detail/?${queryString.toString()}`, { signal })
+}
+
 export const api = {
+  apiRequest,
   get,
   findRoute,
+  placeAutocomplete,
+  placeDetail,
 }

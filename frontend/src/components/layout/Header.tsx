@@ -1,16 +1,88 @@
-/**
- * Header — Thanh điều hướng phía trên bản đồ.
- * Hiện tại chỉ hiển thị tiêu đề.
- * Sau này thêm SearchBar, LayerControl vào đây.
- */
-const Header = () => {
-  return (
-    <header className="absolute top-0 left-0 right-0 z-10 flex items-center h-14 px-4 bg-white/90 backdrop-blur-sm shadow-sm">
-      <h1 className="text-lg font-semibold text-gray-800">
-        🚌 WebGIS — Tuyến xe buýt Hà Nội
-      </h1>
+import type { ReactNode } from 'react'
+import { NavLink } from 'react-router-dom'
 
-      {/* TODO: Thêm SearchBar, LayerControl, UserMenu ở đây */}
+import { useAuth } from '../../hooks/useAuth'
+
+interface HeaderProps {
+  variant?: 'page' | 'overlay'
+  centerContent?: ReactNode
+}
+
+const Header = ({ variant = 'page', centerContent = null }: HeaderProps) => {
+  const { user, logout } = useAuth()
+  const isOverlay = variant === 'overlay'
+  const wrapperClassName = isOverlay
+    ? 'absolute inset-x-0 top-0 z-10'
+    : 'border-b border-slate-200 bg-white'
+
+  const navLinkClassName = ({ isActive }: { isActive: boolean }) =>
+    `rounded-full px-3 py-2 text-sm font-medium transition ${
+      isActive
+        ? 'bg-slate-900 text-white'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+    }`
+
+  const handleLogout = () => {
+    logout().catch(() => undefined)
+  }
+
+  return (
+    <header className={wrapperClassName}>
+      <div
+        className={`mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 ${
+          isOverlay
+            ? 'min-h-14 max-w-none bg-white/90 py-3 backdrop-blur-sm shadow-sm'
+            : 'h-14'
+        }`}
+      >
+        <NavLink to="/" className="shrink-0 text-lg font-semibold text-slate-900">
+          WebGIS Bus Routing
+        </NavLink>
+
+        {centerContent ? (
+          <div className="order-3 w-full md:order-none md:flex-1 md:px-4">
+            <div className="mx-auto w-full max-w-2xl">
+              {centerContent}
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
+
+        <nav className="ml-auto flex shrink-0 items-center gap-2">
+          <NavLink to="/" end className={navLinkClassName}>
+            Map
+          </NavLink>
+          {user?.is_staff ? (
+            <NavLink to="/manage" className={navLinkClassName}>
+              Manage
+            </NavLink>
+          ) : null}
+          {user?.is_authenticated ? (
+            <>
+              <span className="hidden text-sm font-medium text-slate-600 sm:inline">
+                {user.username}
+              </span>
+              <button
+                className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                type="button"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <NavLink to="/login" className={navLinkClassName}>
+                Login
+              </NavLink>
+              <NavLink to="/register" className={navLinkClassName}>
+                Register
+              </NavLink>
+            </>
+          )}
+        </nav>
+      </div>
     </header>
   )
 }

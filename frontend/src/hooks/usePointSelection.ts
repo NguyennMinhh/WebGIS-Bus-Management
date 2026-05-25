@@ -35,21 +35,19 @@ export const usePointSelection = (): UsePointSelectionResult => {
   }, [])
 
   const handleMapClick = useCallback((point: LngLat) => {
+    if (!mode) return
+
     geolocationRequestIdRef.current += 1
-    setIsLocating(false)
-    setErrorMessage(null)
 
     if (mode === 'from') {
       setFromPoint(point)
-      setMode(null)
-      return
+    } else {
+      setToPoint(point)
     }
 
-    if (mode === 'to') {
-      setToPoint(point)
-      setMode(null)
-      return
-    }
+    setIsLocating(false)
+    setErrorMessage(null)
+    setMode(null)
   }, [mode])
 
   const setFromGPS = useCallback(() => {

@@ -32,6 +32,7 @@ if env_file.exists():
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-local-dev-key-change-me')
 DEBUG       = env('DJANGO_DEBUG')
 ALLOWED_HOSTS = env('DJANGO_ALLOWED_HOSTS')
+GOONG_API_KEY = env('GOONG_API_KEY', default='')
 
 # ---------------------------------------------------------------------------
 # Applications

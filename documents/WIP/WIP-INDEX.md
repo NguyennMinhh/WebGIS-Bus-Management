@@ -18,6 +18,7 @@ Route Finder là tính năng cốt lõi của hệ thống, cho phép người d
 | [WIP-F02-Route-Results-Panel.md](./WIP-F02-Route-Results-Panel.md) | Tìm tuyến dạng 1 + hiển thị kết quả (right panel, multi-colour) | 🔄 Đang code | F01 |
 | WIP-F03-Tim-Tuyen-Dang-2.md | Tìm tuyến dạng 2: *(chưa thiết kế)* | ⏳ Chưa bắt đầu | F02 |
 | WIP-F04-Tim-Tuyen-Dang-3.md | Tìm tuyến dạng 3: *(chưa thiết kế)* | ⏳ Chưa bắt đầu | F03 |
+| [WIP-F05-Place-Search-Goong.md](./WIP-F05-Place-Search-Goong.md) | Tìm địa điểm theo tên (Goong Autocomplete, bias Hà Nội) | ✅ Đã implement | — |
 
 ### Mô tả nhanh từng dạng
 

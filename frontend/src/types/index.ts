@@ -1,5 +1,21 @@
 export type LngLat = [number, number]
 
+export interface AuthUser {
+  is_authenticated: boolean
+  username: string
+  email: string
+  is_staff: boolean
+}
+
+export interface LoginInput {
+  username: string
+  password: string
+}
+
+export interface RegisterInput extends LoginInput {
+  email?: string
+}
+
 export interface RouteGeometry {
   type: 'MultiLineString' | 'LineString'
   coordinates: LngLat[] | LngLat[][]
@@ -7,19 +23,40 @@ export interface RouteGeometry {
 
 export interface BusRoute {
   id: number
+  osm_id: string
   ref: string
-  name: string | null
+  name: string
   from_stop: string
   to_stop: string
   operator: string
   opening_hours: string
-  charge: string | null
-  interval: string | null
-  geometry: RouteGeometry
+  charge: string
+  interval: string
 }
 
 export interface BusStop {
   id: number
+  osm_id: string
+  name: string
+  lat: number
+  lng: number
+}
+
+export interface PlaceSuggestion {
+  place_id: string
+  description: string
+  main_text: string
+  secondary_text: string
+}
+
+export interface PlaceDetail {
+  lng: number
+  lat: number
+  name: string
+}
+
+export interface BusStopInput {
+  osm_id: string
   name: string
   lat: number
   lng: number
@@ -34,6 +71,22 @@ export interface BusStopBasic {
 
 export interface RouteStop extends BusStopBasic {
   sequence: number
+}
+
+export interface BusRouteInput {
+  osm_id: string
+  ref: string
+  name: string
+  from_stop: string
+  to_stop: string
+  operator: string
+  opening_hours: string
+  charge: string
+  interval: string
+}
+
+export interface BusRouteDetail extends BusRoute {
+  stops: RouteStop[]
 }
 
 export interface RouteOption {
@@ -53,4 +106,16 @@ export interface RouteOption {
     type: 'LineString'
     coordinates: LngLat[]
   }
+}
+
+export interface WalkingRouteLeg {
+  geometry: {
+    type: 'LineString'
+    coordinates: LngLat[]
+  }
+}
+
+export interface WalkingRoutes {
+  originToBoard: WalkingRouteLeg | null
+  alightToDestination: WalkingRouteLeg | null
 }
