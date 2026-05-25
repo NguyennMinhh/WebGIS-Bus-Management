@@ -8,6 +8,7 @@ import { RouteResultPanel } from './components/search/RouteResultPanel'
 import { useMap } from './hooks/useMap'
 import { usePointSelection } from './hooks/usePointSelection'
 import { useRouteSearch } from './hooks/useRouteSearch'
+import { useWalkingRoutes } from './hooks/useWalkingRoutes'
 import type { PlaceDetail } from './types'
 
 const APP_LOG_PREFIX = '[App]'
@@ -35,6 +36,17 @@ const App = () => {
     selection.toPoint,
     selection.bufferRadius,
   )
+  const selectedRoute =
+    selectedRouteIndex !== null &&
+    selectedRouteIndex >= 0 &&
+    selectedRouteIndex < results.length
+      ? results[selectedRouteIndex]
+      : null
+  const walkingRoutes = useWalkingRoutes(
+    selection.fromPoint,
+    selection.toPoint,
+    selectedRoute,
+  )
 
   useEffect(() => {
     drawSelectionMarkers({
@@ -50,8 +62,12 @@ const App = () => {
   ])
 
   useEffect(() => {
-    drawRouteResults(results, selectedRouteIndex)
-  }, [results, selectedRouteIndex, drawRouteResults])
+    drawRouteResults({
+      results,
+      selectedIndex: selectedRouteIndex,
+      walkingRoutes,
+    })
+  }, [results, selectedRouteIndex, walkingRoutes, drawRouteResults])
 
   useEffect(() => {
     setOverlayLayerVisibility('bus-routes', showBusRoutes)

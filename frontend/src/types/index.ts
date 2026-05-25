@@ -107,3 +107,15 @@ export interface RouteOption {
     coordinates: LngLat[]
   }
 }
+
+export interface WalkingRouteLeg {
+  geometry: {
+    type: 'LineString'
+    coordinates: LngLat[]
+  }
+}
+
+export interface WalkingRoutes {
+  originToBoard: WalkingRouteLeg | null
+  alightToDestination: WalkingRouteLeg | null
+}

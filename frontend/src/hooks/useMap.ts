@@ -31,7 +31,7 @@ import {
   MAP_ZOOM,
   ROUTE_COLORS,
 } from '../utils/mapConfig'
-import type { LngLat, RouteOption } from '../types'
+import type { LngLat, RouteOption, WalkingRouteLeg, WalkingRoutes } from '../types'
 
 const ROUTE_MAP_LOG_PREFIX = '[RouteMap]'
 
@@ -67,6 +67,12 @@ interface DrawSelectionMarkersParams {
   bufferRadius: number
 }
 
+interface DrawRouteResultsParams {
+  results: RouteOption[]
+  selectedIndex: number | null
+  walkingRoutes: WalkingRoutes
+}
+
 type OverlayLayerName = 'bus-routes' | 'bus-stops'
 
 const toRgbaColor = (hexColor: string, opacity: number) => {
@@ -83,6 +89,15 @@ const toRgbaColor = (hexColor: string, opacity: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`
 }
 
+const walkingRouteStyle = new Style({
+  stroke: new Stroke({
+    color: 'black',
+    width: 5,
+    lineDash: [12, 12],
+  }),
+  zIndex: 5,
+})
+
 export const useMap = (
   targetRef: RefObject<HTMLDivElement>,
   onMapClick?: (point: LngLat) => void,
@@ -91,6 +106,7 @@ export const useMap = (
   const selectionSourceRef = useRef(new VectorSource())
   const routeSourceRef = useRef(new VectorSource())
   const routeStopSourceRef = useRef(new VectorSource())
+  const walkingSourceRef = useRef(new VectorSource())
 
   useEffect(() => {
     if (!targetRef.current || mapRef.current) return
@@ -145,6 +161,12 @@ export const useMap = (
       zIndex: 25,
     })
 
+    const walkingLayer = new VectorLayer({
+      source: walkingSourceRef.current,
+      properties: { name: 'walking-route-results-overlay' },
+      zIndex: 22,
+    })
+
     const selectionLayer = new VectorLayer({
       source: selectionSourceRef.current,
       properties: { name: 'selection-overlay' },
@@ -158,6 +180,7 @@ export const useMap = (
         busRoutesLayer,
         busStopsLayer,
         routeLayer,
+        walkingLayer,
         routeStopLayer,
         selectionLayer,
       ],
@@ -176,6 +199,7 @@ export const useMap = (
       selectionSourceRef.current.clear()
       routeSourceRef.current.clear()
       routeStopSourceRef.current.clear()
+      walkingSourceRef.current.clear()
       map.setTarget(undefined)
       mapRef.current = null
     }
@@ -243,11 +267,13 @@ export const useMap = (
   )
 
   const drawRouteResults = useCallback(
-    (results: RouteOption[], selectedIndex: number | null) => {
+    ({ results, selectedIndex, walkingRoutes }: DrawRouteResultsParams) => {
       const routeSource = routeSourceRef.current
       const routeStopSource = routeStopSourceRef.current
+      const walkingSource = walkingSourceRef.current
       routeSource.clear()
       routeStopSource.clear()
+      walkingSource.clear()
 
       if (results.length === 0) {
         console.info(`${ROUTE_MAP_LOG_PREFIX} Cleared route results because no routes are available.`)
@@ -261,6 +287,35 @@ export const useMap = (
         resultCount: results.length,
         selectedIndex,
       })
+
+      const drawWalkingLeg = (
+        leg: WalkingRouteLeg | null,
+        legName: string,
+      ) => {
+        if (!leg) {
+          return
+        }
+
+        if (leg.geometry.coordinates.length < 2) {
+          console.warn(`${ROUTE_MAP_LOG_PREFIX} Skipped walking leg with too few coordinates.`, {
+            legName,
+          })
+          return
+        }
+
+        const feature = new Feature({
+          geometry: new LineString(
+            leg.geometry.coordinates.map((coordinate) => fromLonLat(coordinate)),
+          ),
+        })
+
+        feature.setProperties({
+          type: 'walking-route',
+          legName,
+        })
+        feature.setStyle(walkingRouteStyle)
+        walkingSource.addFeature(feature)
+      }
 
       results.forEach((option, index) => {
         if (option.sub_route.type !== 'LineString') {
@@ -352,6 +407,9 @@ export const useMap = (
         return
       }
 
+      drawWalkingLeg(walkingRoutes.originToBoard, 'originToBoard')
+      drawWalkingLeg(walkingRoutes.alightToDestination, 'alightToDestination')
+
       const selectedFeature = routeSource
         .getFeatures()
         .find((feature) => feature.get('routeIndex') === selectedIndex)
@@ -389,6 +447,7 @@ export const useMap = (
   const clearRouteResults = useCallback(() => {
     routeSourceRef.current.clear()
     routeStopSourceRef.current.clear()
+    walkingSourceRef.current.clear()
     console.info(`${ROUTE_MAP_LOG_PREFIX} Route result layer cleared.`)
   }, [])
 
